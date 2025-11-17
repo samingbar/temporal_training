@@ -8,6 +8,11 @@ dependencies = [
     "temporalio==1.18.1",
     "aiohttp==3.13.0",
     "pydantic==2.12.0",
+    "ray[default]",
+    "torch",
+    "torchvision",
+    "transformers[torch]",
+    "datasets",
 ]
 
 [dependency-groups]

@@ -60,6 +60,54 @@ A modern, production-ready template for building Temporal applications using [Te
    uv run -m src.workflows.http.http_workflow
    ```
 
+### CIFAR-10 Ray Scaling Workflow
+
+The template also includes a CIFAR-10 + Ray scaling workflow that demonstrates how
+Temporal can orchestrate long-running ML training jobs as you scale from a single
+worker on your laptop to many workers in a Ray cluster.
+
+This example is aimed at applied scientists who want to see scaling behavior without
+changing workflow code: the Temporal workflow orchestration stays the same while
+the Ray activity scales up or down.
+
+> Note: The CIFAR-10 activity expects `ray[default]`, `torch`, and `torchvision`
+> to be installed. After adding them to your environment, run `uv sync --dev`.
+
+To run the CIFAR-10 scaling demo:
+
+```bash
+# Start the CIFAR-10 worker
+uv run -m src.workflows.cifar10.worker
+
+# In another terminal, execute the scaling workflow
+uv run -m src.workflows.cifar10.cifar10_workflow
+```
+
+The workflow will sweep over multiple Ray scale configurations (e.g. 1, 2, and 4 workers),
+each as a separate long-running activity. The activity encapsulates the Ray job and returns
+compact metrics (accuracy, wall-clock time, parameter count), while Temporal provides
+orchestration, retries, and durability.
+
+### BERT Fine-Tuning Workflow
+
+The template also includes a BERT fine-tuning workflow using Hugging Face Transformers.
+This demonstrates how Temporal can orchestrate long-running NLP experiments while
+delegating model training and dataset handling to external libraries.
+
+To run the BERT fine-tuning demo:
+
+```bash
+# Start the BERT worker
+uv run -m src.workflows.bert.worker
+
+# In another terminal, execute the workflow
+uv run -m src.workflows.bert.bert_workflow
+```
+
+By default, the workflow runs two BERT fine-tuning configurations on GLUE SST-2,
+aggregates their metrics (loss, accuracy, training time), and prints a concise
+summary so you can compare the impact of training duration and hyperparameters.
+
 ### Next Steps
 
 - Check out some [example prompts](./docs/example-prompts.md) to generate Temporal Workflows using your favorite tool.
