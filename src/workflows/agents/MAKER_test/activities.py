@@ -24,6 +24,15 @@ from .config import PROVIDER, MODEL
 #load_tool_modules("src.workflows.gemini_research_agent.company_research_tools")
 
 
+class LlmResponse(BaseModel):
+    """Schema for JSON responses from the LLM.
+
+    We expect the model to return: {"result": <n_plus_one>}
+    """
+
+    result: int
+
+
 def _provider_name(provider) -> str:
     if hasattr(provider, "value"):
         return str(getattr(provider, "value")).lower()
@@ -50,9 +59,10 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
     contents = step.messages
 
     if _PROVIDER_NAME == "gemini":
-        config = genai.types.GenerateContentConfig(
-            tools=TOOL_SCHEMAS,
-        )
+        config = {
+            "response_mime_type": "application/json",
+            "response_json_schema": LlmResponse.model_json_schema(),
+        }
 
         resp = _llm_client.models.generate_content(
             model=MODEL,
