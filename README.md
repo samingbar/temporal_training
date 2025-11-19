@@ -6,13 +6,16 @@
 
 ## Introduction
 
-A modern, production-ready template for building Temporal applications using [Temporal Python SDK](https://docs.temporal.io/dev-guide/python). This template provides a solid foundation for developing Workflow-based applications with comprehensive testing, linting, and modern Python tooling.
+A modern, production-ready template for building Temporal applications using the [Temporal Python SDK](https://docs.temporal.io/dev-guide/python). This template provides a solid foundation for developing workflow-based applications with comprehensive testing, linting, and modern Python tooling.
 
 ### What's Included
 
 - Complete testing setup (pytest) with async support
 - Pre-configured development tooling (e.g. ruff, pre-commit) and CI
 - Comprehensive documentation and guides
+- End-to-end ML orchestration examples (CIFAR-10 scaling, BERT fine-tuning)
+- An inference workflow example using Ray Serve
+- An LLM-powered agent workflow example (`MAKER_test`) using reusable prompt tooling
 - [AGENTS.md](https://agents.md/) to provide the context and instructions to help AI coding agents work on your project
 
 ## Getting Started
@@ -50,15 +53,39 @@ A modern, production-ready template for building Temporal applications using [Te
    temporal server start-dev
    ```
 
-1. **Run the example workflow** (in a separate terminal):
+1. **Run an example workflow** (in separate terminals):
 
-   ```bash
-   # Start the worker
-   uv run -m src.workflows.http.worker
+   - CIFAR-10 Ray scaling:
 
-   # In another terminal, execute a workflow
-   uv run -m src.workflows.http.http_workflow
-   ```
+     ```bash
+     # Terminal 1: start the worker
+     uv run -m src.workflows.train-tune.cifar10_scaleup.worker
+
+     # Terminal 2: execute the scaling workflow
+     uv run -m src.workflows.train-tune.cifar10_scaleup.cifar10_workflow
+     ```
+
+   - BERT fine-tuning:
+
+     ```bash
+     # Terminal 1: start the worker
+     uv run -m src.workflows.train-tune.bert_finetune.worker
+
+     # Terminal 2: execute the workflow
+     uv run -m src.workflows.train-tune.bert_finetune.bert_workflow
+     ```
+
+   - MAKER agent demo (LLM-based x+1 with voting):
+
+     ```bash
+     # Terminal 1: start the MAKER worker
+     uv run -m src.workflows.agents.MAKER_test.worker
+
+     # Terminal 2: execute the agent workflows
+     uv run -m src.workflows.agents.MAKER_test.run
+     ```
+
+## Example Workflows
 
 ### CIFAR-10 Ray Scaling Workflow
 
@@ -77,10 +104,10 @@ To run the CIFAR-10 scaling demo:
 
 ```bash
 # Start the CIFAR-10 worker
-uv run -m src.workflows.cifar10.worker
+uv run -m src.workflows.train-tune.cifar10_scaleup.worker
 
 # In another terminal, execute the scaling workflow
-uv run -m src.workflows.cifar10.cifar10_workflow
+uv run -m src.workflows.train-tune.cifar10_scaleup.cifar10_workflow
 ```
 
 The workflow will sweep over multiple Ray scale configurations (e.g. 1, 2, and 4 workers),
@@ -98,15 +125,47 @@ To run the BERT fine-tuning demo:
 
 ```bash
 # Start the BERT worker
-uv run -m src.workflows.bert.worker
+uv run -m src.workflows.train-tune.bert_finetune.worker
 
 # In another terminal, execute the workflow
-uv run -m src.workflows.bert.bert_workflow
+uv run -m src.workflows.train-tune.bert_finetune.bert_workflow
 ```
 
 By default, the workflow runs two BERT fine-tuning configurations on GLUE SST-2,
 aggregates their metrics (loss, accuracy, training time), and prints a concise
 summary so you can compare the impact of training duration and hyperparameters.
+
+### Agentic MAKER Test Workflow
+
+The `MAKER_test` workflow demonstrates an LLM-powered agent that repeatedly solves
+the simple numeric task `n → n + 1` while using a MAKER-style voting loop to guard
+against bad generations. It also containes a "Normal" agentic loop for comparison.
+
+Key pieces:
+
+- Prompt modeling and history are built with `src/resources/myprompts`
+- Structured agent I/O types live in `src/workflows/agents/MAKER_test/agent_types.py`
+- The core orchestration lives in `src/workflows/agents/MAKER_test/workflow.py`
+- LLM and tool-calling activities live in `src/workflows/agents/MAKER_test/activities.py`
+
+To run the demo:
+
+```bash
+# Terminal 1: start the MAKER worker
+uv run -m src.workflows.agents.MAKER_test.worker
+
+# Terminal 2: execute both the baseline and MAKER workflows
+uv run -m src.workflows.agents.MAKER_test.run
+```
+
+This will:
+
+- Run a baseline agent (`NormalAgentWorkflow`) that calls the LLM step by step
+- Run the MAKER-style agent (`MakerWorkflow`) that spawns multiple LLM calls,
+  filters/red-flags outputs, and performs voting over the numeric results.
+
+You can inspect and adapt this example to build more sophisticated LLM agents that
+use tools (via `src/resources/mytools`) and richer prompt assemblies (`src/resources/myprompts`).
 
 ### Next Steps
 
