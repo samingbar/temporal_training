@@ -212,7 +212,7 @@ async def fine_tune_bert(request: BertFineTuneRequest) -> BertFineTuneResult:
         request.config.dataset_name,
         request.config.dataset_config_name,
     )
-    result = await asyncio.to_thread(_fine_tune_bert_sync, request)
+    result = await asyncio.to_thread(_fine_tune_bert_sync, request) #Offload the training to a separate thread. In the future, move to a separate cluster?
     activity.logger.info(
         "Completed BERT fine-tuning run %s with loss %.4f and accuracy %s",
         request.run_id,

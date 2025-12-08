@@ -8,7 +8,7 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from pydantic import BaseModel
 
-    from src.workflows.bert.bert_activities import (
+    from src.workflows.train_tune.bert_finetune.bert_activities import (
         BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,
@@ -75,10 +75,10 @@ class BertFineTuningWorkflow:
         )
         return BertExperimentOutput(experiment_name=input.experiment_name, runs=results)
 
-async def main() -> None:  # pragma: no cover
+async def main() -> None:  
     """Execute a sample BERT fine-tuning workflow against a local Temporal server."""
-    from temporalio.client import Client  # noqa: PLC0415
-    from temporalio.contrib.pydantic import pydantic_data_converter  # noqa: PLC0415
+    from temporalio.client import Client  
+    from temporalio.contrib.pydantic import pydantic_data_converter  
 
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
 
@@ -126,6 +126,6 @@ async def main() -> None:  # pragma: no cover
             f"time_s={run.training_time_seconds:.1f}",
         )
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":  
     asyncio.run(main())
 

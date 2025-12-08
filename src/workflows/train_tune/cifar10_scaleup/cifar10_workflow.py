@@ -8,7 +8,7 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from pydantic import BaseModel
 
-    from src.workflows.cifar10.cifar10_activities import (
+    from src.workflows.train_tune.cifar10_scaleup.cifar10_activities import (
         Cifar10TrainRequest,
         Cifar10TrainResult,
         RayScaleConfig,

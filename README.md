@@ -103,11 +103,17 @@ the Ray activity scales up or down.
 To run the CIFAR-10 scaling demo:
 
 ```bash
+#Start the Ray Cluster
+ uv run -m src.workflows.train_tune.cifar10_scaleup.local_ray_cluster
+
+#In a new terminal, update the RAY_ADDRESS
+export RAY_ADDRESS='127.0.0.1:6379'
+
 # Start the CIFAR-10 worker
-uv run -m src.workflows.train-tune.cifar10_scaleup.worker
+uv run -m src.workflows.train_tune.cifar10_scaleup.worker
 
 # In another terminal, execute the scaling workflow
-uv run -m src.workflows.train-tune.cifar10_scaleup.cifar10_workflow
+uv run -m src.workflows.train_tune.cifar10_scaleup.cifar10_workflow
 ```
 
 The workflow will sweep over multiple Ray scale configurations (e.g. 1, 2, and 4 workers),
@@ -125,10 +131,10 @@ To run the BERT fine-tuning demo:
 
 ```bash
 # Start the BERT worker
-uv run -m src.workflows.train-tune.bert_finetune.worker
+uv run -m src.workflows.train_tune.bert_finetune.worker
 
 # In another terminal, execute the workflow
-uv run -m src.workflows.train-tune.bert_finetune.bert_workflow
+uv run -m src.workflows.train_tune.bert_finetune.bert_workflow
 ```
 
 By default, the workflow runs two BERT fine-tuning configurations on GLUE SST-2,

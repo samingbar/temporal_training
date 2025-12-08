@@ -18,3 +18,7 @@ bin/
 
 # MacOS
 .DS_Store
+
+#Training Outputs
+bert_runs/
+cifar10_runs/
