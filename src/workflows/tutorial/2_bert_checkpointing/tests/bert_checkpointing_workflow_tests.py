@@ -1,4 +1,4 @@
-"""Tests for the BERT fine-tuning and inference workflows."""
+"""Tests for the BERT fine-tuning and inference workflows (checkpointing package)."""
 
 import uuid
 from concurrent.futures import ThreadPoolExecutor

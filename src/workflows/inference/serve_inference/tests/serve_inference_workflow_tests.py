@@ -8,8 +8,10 @@ from temporalio import activity
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.workflows.serve_inference.serve_inference_activities import InferenceRequest
-from src.workflows.serve_inference.serve_inference_workflow import (
+from src.workflows.inference.serve_inference.serve_inference_activities import (
+    InferenceRequest,
+)
+from src.workflows.inference.serve_inference.serve_inference_workflow import (
     BatchInferenceInput,
     BatchInferenceItem,
     BatchInferenceOutput,
@@ -62,4 +64,3 @@ class TestServeBatchInferenceWorkflow:
             assert result.results[0].status_code == 200
             assert result.results[0].output == {"prediction": {"text": "a"}}
             assert result.results[1].output == {"prediction": {"text": "b"}}
-

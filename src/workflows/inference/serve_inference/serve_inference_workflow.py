@@ -14,10 +14,10 @@ from temporalio import workflow
 
 # Guard imports that are not required for determinism so Temporal can safely replay
 with workflow.unsafe.imports_passed_through():
-    from src.workflows.serve_inference.serve_inference_activities import (
+    from src.workflows.inference.serve_inference.serve_inference_activities import (
         call_serve_inference,
     )
-    from src.workflows.serve_inference.types import (
+    from src.workflows.inference.serve_inference.types import (
         BatchInferenceInput,
         BatchInferenceItem,
         BatchInferenceOutput,
@@ -62,5 +62,4 @@ class ServeBatchInferenceWorkflow:
         tasks = [one_call(item) for item in input.items]
         results: list[InferenceResponse] = await asyncio.gather(*tasks)
         return BatchInferenceOutput(results=results)
-
 

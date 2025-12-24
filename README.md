@@ -65,14 +65,14 @@ A modern, production-ready template for building Temporal applications using the
      uv run -m src.workflows.train-tune.cifar10_scaleup.cifar10_workflow
      ```
 
-   - BERT fine-tuning:
+   - BERT fine-tuning and inference:
 
      ```bash
-     # Terminal 1: start the worker
-     uv run -m src.workflows.train-tune.bert_finetune.worker
+     # Terminal 1: start the BERT worker (training + inference)
+     uv run -m src.workflows.train_tune.bert_finetune.worker
 
-     # Terminal 2: execute the workflow
-     uv run -m src.workflows.train-tune.bert_finetune.bert_workflow
+     # Terminal 2: execute the fine-tuning demo workflow
+     uv run -m src.workflows.train_tune.bert_finetune.bert_workflow
      ```
 
    - MAKER agent demo (LLM-based x+1 with voting):
@@ -121,25 +121,37 @@ each as a separate long-running activity. The activity encapsulates the Ray job 
 compact metrics (accuracy, wall-clock time, parameter count), while Temporal provides
 orchestration, retries, and durability.
 
-### BERT Fine-Tuning Workflow
+### BERT Fine-Tuning and Inference Workflows
 
-The template also includes a BERT fine-tuning workflow using Hugging Face Transformers.
-This demonstrates how Temporal can orchestrate long-running NLP experiments while
-delegating model training and dataset handling to external libraries.
+The template also includes a pair of BERT workflows using Hugging Face Transformers:
+
+- `BertFineTuningWorkflow` orchestrates long-running fine-tuning runs.
+- `BertInferenceWorkflow` runs batch inference using a fine-tuned checkpoint saved from training.
+
+Together, they demonstrate how Temporal can orchestrate end-to-end NLP experiments while
+delegating model training, checkpointing, and inference to external ML libraries.
 
 To run the BERT fine-tuning demo:
 
 ```bash
-# Start the BERT worker
+# Start the BERT worker (handles both training and inference)
 uv run -m src.workflows.train_tune.bert_finetune.worker
 
-# In another terminal, execute the workflow
+# In another terminal, execute the fine-tuning workflow
 uv run -m src.workflows.train_tune.bert_finetune.bert_workflow
 ```
 
 By default, the workflow runs two BERT fine-tuning configurations on GLUE SST-2,
 aggregates their metrics (loss, accuracy, training time), and prints a concise
 summary so you can compare the impact of training duration and hyperparameters.
+Each fine-tuning run writes its checkpoint and tokenizer to `./bert_runs/{run_id}`. For a
+fast demo on a high-end laptop, the activity caps the number of training and evaluation
+examples by default (you can override `max_train_samples` and `max_eval_samples` on
+`BertFineTuneConfig` to use more data or the full dataset).
+
+This pattern keeps workflow code deterministic: the workflows orchestrate which
+fine-tuned run to use and when to run inference, while the heavy lifting (loading
+checkpoints, tokenization, and model forward passes) stays inside Temporal activities.
 
 ### Agentic MAKER Test Workflow
 

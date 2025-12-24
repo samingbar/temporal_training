@@ -1,4 +1,4 @@
-"""Tests for BERT fine-tuning and inference activities."""
+"""Tests for BERT fine-tuning and inference activities (bert_eval package)."""
 
 from unittest.mock import patch
 

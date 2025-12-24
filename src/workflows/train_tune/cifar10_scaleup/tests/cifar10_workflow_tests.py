@@ -8,12 +8,12 @@ from temporalio import activity
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.workflows.cifar10.cifar10_activities import (
+from src.workflows.train_tune.cifar10_scaleup.cifar10_activities import (
     Cifar10TrainRequest,
     Cifar10TrainResult,
     RayScaleConfig,
 )
-from src.workflows.cifar10.cifar10_workflow import (
+from src.workflows.train_tune.cifar10_scaleup.cifar10_workflow import (
     Cifar10ScalingInput,
     Cifar10ScalingOutput,
     Cifar10ScalingWorkflow,
@@ -111,4 +111,3 @@ class TestCifar10ScalingWorkflow:
             assert scaled_run.scale.num_workers == 4
             assert scaled_run.test_accuracy > baseline_run.test_accuracy
             assert scaled_run.training_time_seconds < baseline_run.training_time_seconds
-

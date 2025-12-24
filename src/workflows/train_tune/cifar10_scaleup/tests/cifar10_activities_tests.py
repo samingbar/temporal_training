@@ -1,16 +1,18 @@
 """Tests for CIFAR-10 Ray training activities."""
 
 from unittest.mock import patch
+
 import pytest
 from temporalio.testing import ActivityEnvironment
 
-from src.workflows.cifar10.cifar10_activities import (
+from src.workflows.train_tune.cifar10_scaleup.cifar10_activities import (
     Cifar10TrainRequest,
     Cifar10TrainResult,
     RayScaleConfig,
     train_cifar10_with_ray,
 )
-f
+
+
 class TestCifar10Activities:
     """Test suite for CIFAR-10 training activities.
 
@@ -47,11 +49,10 @@ class TestCifar10Activities:
         )
 
         with patch(
-            "src.workflows.cifar10.cifar10_activities._train_cifar10_with_ray_sync",
+            "src.workflows.train_tune.cifar10_scaleup.cifar10_activities._train_cifar10_with_ray_sync",
             return_value=expected_result,
         ) as mock_train:
             result = await activity_environment.run(train_cifar10_with_ray, request)
 
         assert result == expected_result
         mock_train.assert_called_once_with(request)
-

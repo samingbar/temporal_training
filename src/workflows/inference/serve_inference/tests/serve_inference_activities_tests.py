@@ -3,7 +3,7 @@
 import pytest
 from temporalio.testing import ActivityEnvironment
 
-from src.workflows.serve_inference.serve_inference_activities import (
+from src.workflows.inference.serve_inference.serve_inference_activities import (
     InferenceRequest,
     call_serve_inference,
 )
@@ -17,7 +17,7 @@ async def test_call_serve_inference_returns_success_when_endpoint_returns_json(m
         return 200, {"ok": True, "echo": json_payload}
 
     # Patch the HTTP helper
-    from src.workflows.serve_inference import serve_inference_activities as mod
+    from src.workflows.inference.serve_inference import serve_inference_activities as mod
 
     monkeypatch.setattr(mod, "_post_json", fake_post_json)
 
@@ -38,7 +38,7 @@ async def test_call_serve_inference_returns_error_on_5xx(monkeypatch: pytest.Mon
     async def fake_post_json(url: str, json_payload: dict, timeout: float):  # noqa: ARG001
         return 500, "internal error"
 
-    from src.workflows.serve_inference import serve_inference_activities as mod
+    from src.workflows.inference.serve_inference import serve_inference_activities as mod
 
     monkeypatch.setattr(mod, "_post_json", fake_post_json)
 
@@ -59,7 +59,7 @@ async def test_call_serve_inference_returns_599_on_exception(monkeypatch: pytest
     async def fake_post_json(url: str, json_payload: dict, timeout: float):  # noqa: ARG001
         raise RuntimeError("boom")
 
-    from src.workflows.serve_inference import serve_inference_activities as mod
+    from src.workflows.inference.serve_inference import serve_inference_activities as mod
 
     monkeypatch.setattr(mod, "_post_json", fake_post_json)
 
@@ -70,4 +70,3 @@ async def test_call_serve_inference_returns_599_on_exception(monkeypatch: pytest
     assert result.status_code == 599
     assert result.output is None
     assert result.error == "boom"
-

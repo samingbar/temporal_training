@@ -12,10 +12,7 @@ from typing import Any
 import aiohttp
 from pydantic import ValidationError
 from temporalio import activity
-from src.workflows.serve_inference.types import (
-    InferenceRequest,
-    InferenceResponse,
-)
+from src.workflows.inference.serve_inference.types import InferenceRequest, InferenceResponse
 
 async def _post_json(url: str, json_payload: dict[str, Any], timeout: float) -> tuple[int, Any]:
     """POST JSON to ``url`` and parse a JSON response when possible.
