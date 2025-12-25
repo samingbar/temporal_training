@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+
 from temporalio import workflow
 
 # Guard imports that are not required for determinism so Temporal can safely replay
@@ -25,12 +26,13 @@ with workflow.unsafe.imports_passed_through():
         InferenceResponse,
     )
 
+
 @workflow.defn
 class ServeBatchInferenceWorkflow:
     """Orchestrates parallel Ray Serve calls via activities and aggregates results."""
 
     @workflow.run
-    async def run(self, input: BatchInferenceInput) -> BatchInferenceOutput:  # noqa: A002
+    async def run(self, input: BatchInferenceInput) -> BatchInferenceOutput:
         """Run the batch inference orchestration.
 
         The workflow triggers one activity per input item concurrently and
@@ -55,11 +57,12 @@ class ServeBatchInferenceWorkflow:
             return await workflow.execute_activity(
                 call_serve_inference,
                 req,
-                start_to_close_timeout=timedelta(seconds=max(1, int(input.per_request_timeout_seconds) + 2)),
+                start_to_close_timeout=timedelta(
+                    seconds=max(1, int(input.per_request_timeout_seconds) + 2)
+                ),
             )
 
         # Fan-out and gather preserving order
         tasks = [one_call(item) for item in input.items]
         results: list[InferenceResponse] = await asyncio.gather(*tasks)
         return BatchInferenceOutput(results=results)
-

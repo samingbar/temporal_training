@@ -20,7 +20,6 @@ from src.workflows.train_tune.bert_checkpointing.custom_types import BertFineTun
 
 async def main() -> None:
     """Execute a sample checkpoint-aware BERT training workflow."""
-
     # 1. Connect to the Temporal server using the Pydantic data converter so
     #    that our Pydantic models can be sent over the wire transparently.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)

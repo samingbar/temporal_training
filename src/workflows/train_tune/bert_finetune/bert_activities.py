@@ -15,17 +15,14 @@ import contextlib
 import time
 from typing import Final
 
-from pydantic import BaseModel, Field  # Imported for type-checking and parity with custom types.
 from temporalio import activity
+
 from src.workflows.train_tune.bert_finetune.custom_types import (
-    BertExperimentInput,
-    BertFineTuneConfig,
     BertFineTuneRequest,
     BertFineTuneResult,
     BertInferenceRequest,
     BertInferenceResult,
 )
-
 
 # Human-friendly error message surfaced when ML dependencies are missing. This keeps
 # the Temporal worker process healthy even if the Python environment is not configured
@@ -86,8 +83,6 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     raw_datasets = load_dataset(config.dataset_name, config.dataset_config_name)
     tokenizer = AutoTokenizer.from_pretrained(config.model_name)
 
-
-
     # Apply the tokenizer across the dataset; `batched=True` lets HF process
     # multiple rows at once for better throughput.
     tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
@@ -99,7 +94,9 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     )
 
     train_dataset = tokenized_datasets["train"]
-    eval_dataset = tokenized_datasets.get("validation") or tokenized_datasets.get("validation_matched")
+    eval_dataset = tokenized_datasets.get("validation") or tokenized_datasets.get(
+        "validation_matched"
+    )
 
     # -------------------------------------------------------------------------
     # 3. Optionally sub-sample train/eval for a fast demo run on laptops.

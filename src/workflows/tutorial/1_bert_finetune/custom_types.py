@@ -16,7 +16,6 @@ from typing import Final  # noqa: F401  - kept for parity with other modules.
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Activity-level types (training and inference)
 # ---------------------------------------------------------------------------
@@ -191,5 +190,3 @@ class BertExperimentOutput(BaseModel):
 
     runs: list[BertFineTuneResult]
     """Per-configuration fine-tuning results."""
-
-

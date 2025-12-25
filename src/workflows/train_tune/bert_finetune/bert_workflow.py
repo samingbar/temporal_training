@@ -12,7 +12,6 @@ lives in ``bert_activities.py`` so that these workflows can be safely replayed
 by Temporal without talking to external systems.
 """
 
-import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
@@ -23,7 +22,6 @@ with workflow.unsafe.imports_passed_through():
     from src.workflows.train_tune.bert_finetune.custom_types import (
         BertExperimentInput,
         BertExperimentOutput,
-        BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,
         BertInferenceRequest,
@@ -94,7 +92,7 @@ class BertInferenceWorkflow:
     """
 
     @workflow.run
-    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:  # noqa: A002
+    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:
         """Execute BERT inference for a batch of texts."""
         workflow.logger.info(
             "Starting BERT inference workflow for run %s on %s text(s)",

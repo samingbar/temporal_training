@@ -11,7 +11,9 @@ from src.workflows.train_tune.bert_eval.bert_activities import (
     BertEvalActivities,
 )
 from src.workflows.train_tune.bert_eval.checkpointed_training import (
-    CheckpointedBertTrainingWorkflow, BertEvalWorkflow,CoordinatorWorkflow
+    BertEvalWorkflow,
+    CheckpointedBertTrainingWorkflow,
+    CoordinatorWorkflow,
 )
 
 

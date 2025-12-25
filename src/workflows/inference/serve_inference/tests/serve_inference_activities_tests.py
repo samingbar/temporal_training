@@ -10,7 +10,9 @@ from src.workflows.inference.serve_inference.serve_inference_activities import (
 
 
 @pytest.mark.asyncio
-async def test_call_serve_inference_returns_success_when_endpoint_returns_json(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_call_serve_inference_returns_success_when_endpoint_returns_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Should return parsed JSON and 200 on success."""
 
     async def fake_post_json(url: str, json_payload: dict, timeout: float):  # noqa: ARG001
@@ -53,7 +55,9 @@ async def test_call_serve_inference_returns_error_on_5xx(monkeypatch: pytest.Mon
 
 
 @pytest.mark.asyncio
-async def test_call_serve_inference_returns_599_on_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_call_serve_inference_returns_599_on_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Should map exceptions to a 599-like transport error with message."""
 
     async def fake_post_json(url: str, json_payload: dict, timeout: float):  # noqa: ARG001

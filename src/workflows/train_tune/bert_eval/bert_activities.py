@@ -21,7 +21,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final
 
-from pydantic import BaseModel, Field  # Imported for parity with custom types.
 from temporalio import activity
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -118,7 +117,11 @@ class BertFineTuneActivities:
         # ------------------------------------------------------------------
         if self.config.use_gpu and torch.cuda.is_available():
             device = torch.device("cuda")
-        elif self.config.use_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        elif (
+            self.config.use_gpu
+            and hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
@@ -209,9 +212,7 @@ class BertFineTuneActivities:
         output_dir = Path(training_args.output_dir)
         resume_path = request.resume_from_checkpoint
         if resume_path is None and output_dir.exists():
-            existing_checkpoints = sorted(
-                p for p in output_dir.glob("checkpoint-*") if p.is_dir()
-            )
+            existing_checkpoints = sorted(p for p in output_dir.glob("checkpoint-*") if p.is_dir())
             if existing_checkpoints:
                 resume_path = str(existing_checkpoints[-1])
 
@@ -237,7 +238,9 @@ class BertFineTuneActivities:
             run_id=request.run_id,
             config=self.config,
             train_loss=float(train_result.training_loss),
-            eval_accuracy=float(metrics.get("eval_accuracy")) if "eval_accuracy" in metrics else None,
+            eval_accuracy=float(metrics.get("eval_accuracy"))
+            if "eval_accuracy" in metrics
+            else None,
             training_time_seconds=training_time_seconds,
             num_parameters=num_parameters,
             dataset_snapshot=request.dataset_snapshot,
@@ -262,8 +265,7 @@ class BertFineTuneActivities:
         # - Keep the heavy ML work off the event loop thread, and
         # - Give Temporal visibility into progress via heartbeats, which in turn
         #   enables heartbeat timeouts and cancellation handling.
-        
-        
+
         training_task = asyncio.create_task(asyncio.to_thread(self._fine_tune_bert_sync, request))
         try:
             while not training_task.done():
@@ -321,6 +323,7 @@ class BertFineTuneActivities:
         )
         return result
 
+
 class BertInferenceActivities:
     def __init__(self):
         pass
@@ -332,11 +335,12 @@ class BertInferenceActivities:
         Temporal-specific APIs. It simply loads a saved model and tokenizer from
         disk and runs a forward pass over a batch of texts.
         """
-
         # Device selection mirroring the training configuration.
         if request.use_gpu and torch.cuda.is_available():
             device = torch.device("cuda")
-        elif request.use_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        elif (
+            request.use_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        ):
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
@@ -400,46 +404,45 @@ class BertCheckpointingActivities:
     def __init__(self):
         pass
 
-    def _create_dataset_snapshot_sync(self, request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
+    def _create_dataset_snapshot_sync(
+        self, request: DatasetSnapshotRequest
+    ) -> DatasetSnapshotResult:
         """Create a dataset snapshot synchronously.
-        
+
         This helper is synchronous; the async activity delegates to it via
         ``asyncio.to_thread`` for non-blocking execution.
         """
-        
         # Load the dataset
         raw_datasets = load_dataset(
             request.dataset_name,
             request.dataset_config,
         )
-        
+
         train_dataset = raw_datasets["train"]
-        
+
         # Apply sampling if requested
         if request.max_samples and request.max_samples < len(train_dataset):
             train_dataset = train_dataset.select(range(request.max_samples))
-        
+
         # Compute content hash
         hasher = hashlib.sha256()
         for idx in sorted(range(len(train_dataset))):
             example = train_dataset[idx]
             content = f"{example.get('sentence', '')}|{example.get('label', '')}"
-            hasher.update(content.encode('utf-8'))
-        
+            hasher.update(content.encode("utf-8"))
+
         data_hash = hasher.hexdigest()[:16]
-        
+
         # Create snapshot ID
         snapshot_id = f"{request.dataset_name}-{request.dataset_config}-{data_hash}"
-        
+
         # Path for this snapshot
         snapshot_path = Path(request.snapshot_dir) / snapshot_id
-        
+
         # Check if snapshot already exists
         if snapshot_path.exists():
-            activity.logger.info(
-                f"Reusing existing snapshot {snapshot_id} (identical data)"
-            )
-            
+            activity.logger.info(f"Reusing existing snapshot {snapshot_id} (identical data)")
+
             # Load existing metadata
             with open(snapshot_path / "metadata.json") as f:
                 existing_metadata = json.load(f)
@@ -454,14 +457,14 @@ class BertCheckpointingActivities:
                 snapshot_timestamp=existing_metadata["created_at"],
                 snapshot_path=str(snapshot_path),
             )
-        
+
         # Create new snapshot
         activity.logger.info(f"Creating new dataset snapshot: {snapshot_id}")
         snapshot_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Save dataset in JSONL format
         train_dataset.to_json(snapshot_path / "data.jsonl")
-        
+
         # Save metadata
         metadata = {
             "snapshot_id": snapshot_id,
@@ -473,14 +476,12 @@ class BertCheckpointingActivities:
             "created_by_run": request.run_id,
             "format_version": "1.0",
         }
-        
+
         with open(snapshot_path / "metadata.json", "w") as f:
             json.dump(metadata, f, indent=2)
-        
-        activity.logger.info(
-            f"Snapshot saved: {len(train_dataset)} samples, hash {data_hash}"
-        )
-        
+
+        activity.logger.info(f"Snapshot saved: {len(train_dataset)} samples, hash {data_hash}")
+
         return DatasetSnapshotResult(
             snapshot_id=snapshot_id,
             dataset_name=request.dataset_name,
@@ -492,25 +493,26 @@ class BertCheckpointingActivities:
             snapshot_path=str(snapshot_path),
         )
 
-
     @activity.defn
-    async def create_dataset_snapshot(self, request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
+    async def create_dataset_snapshot(
+        self, request: DatasetSnapshotRequest
+    ) -> DatasetSnapshotResult:
         """Temporal activity that creates a versioned dataset snapshot."""
         activity.logger.info(
             "Creating dataset snapshot for %s/%s",
             request.dataset_name,
             request.dataset_config,
         )
-        
+
         # Offload to thread to avoid blocking worker
         snapshot = await asyncio.to_thread(self._create_dataset_snapshot_sync, request)
-        
+
         activity.logger.info(
             "Dataset snapshot ready: %s (hash: %s)",
             snapshot.snapshot_id,
             snapshot.data_hash,
         )
-        
+
         return snapshot
 
 
@@ -532,7 +534,9 @@ class BertEvalActivities:
         # Select device mirroring the training configuration.
         if request.use_gpu and torch.cuda.is_available():
             device = torch.device("cuda")
-        elif request.use_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        elif (
+            request.use_gpu and hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        ):
             device = torch.device("mps")
         else:
             device = torch.device("cpu")
@@ -549,10 +553,7 @@ class BertEvalActivities:
         eval_dataset = raw_datasets[request.split]
 
         # Optionally subsample for fast, tutorial-friendly runs.
-        if (
-            request.max_eval_samples is not None
-            and request.max_eval_samples < len(eval_dataset)
-        ):
+        if request.max_eval_samples is not None and request.max_eval_samples < len(eval_dataset):
             eval_dataset = eval_dataset.select(range(request.max_eval_samples))
 
         # Tokenize the evaluation dataset into tensors.
@@ -583,11 +584,7 @@ class BertEvalActivities:
 
         with torch.no_grad():
             for batch in data_loader:
-                inputs = {
-                    k: v.to(device)
-                    for k, v in batch.items()
-                    if k != "labels"
-                }
+                inputs = {k: v.to(device) for k, v in batch.items() if k != "labels"}
                 labels = batch["labels"].to(device)
 
                 outputs = model(**inputs)

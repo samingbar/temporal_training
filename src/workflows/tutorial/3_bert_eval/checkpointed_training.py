@@ -50,7 +50,7 @@ class CheckpointedBertTrainingWorkflow:
         return self.latest_checkpoint
 
     @workflow.run
-    async def run(self, config: BertFineTuneConfig) -> BertFineTuneResult:  # noqa: A002
+    async def run(self, config: BertFineTuneConfig) -> BertFineTuneResult:
         """Run a single checkpoint-aware fine-tuning job."""
         # Derive a human-friendly, unique run identifier for this workflow run.
         # We base this on Temporal's run_id so each execution gets a fresh name.
@@ -118,7 +118,7 @@ class BertInferenceWorkflow:
     """Workflow that runs inference using a fine-tuned BERT checkpoint."""
 
     @workflow.run
-    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:  # noqa: A002
+    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:
         """Execute BERT inference for a batch of texts."""
         # Handle both model instances and plain dicts defensively.
         if isinstance(input, dict):
@@ -151,7 +151,7 @@ class BertEvalWorkflow:
     """Workflow that evaluates a fine-tuned BERT model on a public dataset."""
 
     @workflow.run
-    async def run(self, input: BertEvalRequest) -> BertEvalResult:  # noqa: A002
+    async def run(self, input: BertEvalRequest) -> BertEvalResult:
         """Execute evaluation for a fine-tuned BERT run."""
         if isinstance(input, dict):
             run_id = input.get("run_id")

@@ -20,7 +20,6 @@ from src.workflows.train_tune.bert_finetune.bert_workflow import BertInferenceWo
 
 async def main() -> None:
     """Execute a sample BERT inference workflow against a local Temporal server."""
-
     # 1. Connect to Temporal using the same data converter as the training demo.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
 
@@ -58,4 +57,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

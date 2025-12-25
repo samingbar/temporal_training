@@ -23,7 +23,6 @@ from src.workflows.train_tune.bert_finetune.custom_types import (
 
 async def main() -> None:
     """Execute a sample BERT fine-tuning workflow against a local Temporal server."""
-
     # 1. Connect to the Temporal server using the Pydantic data converter so
     #    that our Pydantic models can be sent over the wire transparently.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
@@ -82,4 +81,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -13,7 +13,6 @@ from src.workflows.train_tune.bert_checkpointing.custom_types import BertInferen
 
 async def main() -> None:
     """Execute a sample BERT inference workflow against a local Temporal server."""
-
     # 1. Connect to Temporal using the same data converter as the training demo.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
 

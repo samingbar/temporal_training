@@ -33,7 +33,7 @@ class TestServeBatchInferenceWorkflow:
         """Should orchestrate two mocked inference calls and preserve order."""
 
         @activity.defn(name="call_serve_inference")
-        async def mocked_inference(req: InferenceRequest):  # noqa: ANN201
+        async def mocked_inference(req: InferenceRequest):
             # Simulate a Ray Serve response that echoes the text
             return {"status_code": 200, "output": {"prediction": req.payload}}
 

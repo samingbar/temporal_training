@@ -22,28 +22,21 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 class DatasetSnapshotRequest(BaseModel):
     """Request to create a dataset snapshot."""
-    
-    run_id: str = Field(
-        description="Identifier for the training run requesting this snapshot."
-    )
-    
-    dataset_name: str = Field(
-        description="HuggingFace dataset name (e.g., 'glue')."
-    )
-    
-    dataset_config: str = Field(
-        description="Dataset configuration name (e.g., 'sst2')."
-    )
-    
+
+    run_id: str = Field(description="Identifier for the training run requesting this snapshot.")
+
+    dataset_name: str = Field(description="HuggingFace dataset name (e.g., 'glue').")
+
+    dataset_config: str = Field(description="Dataset configuration name (e.g., 'sst2').")
+
     max_samples: int | None = Field(
-        default=None,
-        description="Optional limit on number of samples to include."
+        default=None, description="Optional limit on number of samples to include."
     )
-    
+
     snapshot_dir: str = Field(
-        default="./data_snapshots",
-        description="Directory to store snapshots."
+        default="./data_snapshots", description="Directory to store snapshots."
     )
+
 
 class DatasetSnapshotResult(BaseModel):
     """Result describing a materialized dataset snapshot.
@@ -81,9 +74,10 @@ class DatasetSnapshotResult(BaseModel):
         description="Filesystem path where the snapshot artifacts are stored.",
     )
 
+
 class CheckpointInfo(BaseModel):
     """Checkpoint information sent via signals."""
-        
+
     epoch: int = Field(description="Training epoch number")
     step: int = Field(description="Global training step")
     path: str = Field(description="Filesystem path to checkpoint")
@@ -170,17 +164,16 @@ class BertFineTuneRequest(BaseModel):
     config: BertFineTuneConfig
     """Configuration for the fine-tuning experiment."""
 
-    #NEW: Pass the dataset snapshot to use for reproducible training
-    dataset_snapshot: DatasetSnapshotResult | None = Field( 
-        default=None,
-        description="Optional dataset snapshot to use for reproducible training."
+    # NEW: Pass the dataset snapshot to use for reproducible training
+    dataset_snapshot: DatasetSnapshotResult | None = Field(
+        default=None, description="Optional dataset snapshot to use for reproducible training."
     )
 
-    #NEW: Allow resuming from checkpoint through act
+    # NEW: Allow resuming from checkpoint through act
     resume_from_checkpoint: str | None = Field(
-        default=None,
-        description="Path to checkpoint to resume from (if retrying)"
+        default=None, description="Path to checkpoint to resume from (if retrying)"
     )
+
 
 class BertFineTuneResult(BaseModel):
     """Summary metrics from a BERT fine-tuning run."""
@@ -209,14 +202,12 @@ class BertFineTuneResult(BaseModel):
     )
 
     dataset_snapshot: DatasetSnapshotResult | None = Field(
-        default=None,
-        description="Dataset snapshot used for this training run (if any)."
+        default=None, description="Dataset snapshot used for this training run (if any)."
     )
 
     total_checkpoints_saved: int = Field(
         description="Total number of checkpoints saved during training.",
     )
-    
 
 
 class BertInferenceRequest(BaseModel):

@@ -12,20 +12,25 @@ from typing import Any
 import aiohttp
 from pydantic import ValidationError
 from temporalio import activity
+
 from src.workflows.inference.serve_inference.types import InferenceRequest, InferenceResponse
+
 
 async def _post_json(url: str, json_payload: dict[str, Any], timeout: float) -> tuple[int, Any]:
     """POST JSON to ``url`` and parse a JSON response when possible.
 
     Parameters
+    ----------
     - url: Fully qualified endpoint URL (e.g., http://localhost:8000/inference)
     - json_payload: JSON-serializable request body
     - timeout: Total timeout for the HTTP request in seconds
 
     Returns
+    -------
     A tuple of ``(status_code, data)`` where ``data`` is the parsed JSON body
     when available, otherwise the raw response text. Kept separate for simpler
     monkeypatching in tests.
+
     """
     async with aiohttp.ClientSession() as session:
         async with session.post(url, json=json_payload, timeout=timeout) as resp:
@@ -36,6 +41,7 @@ async def _post_json(url: str, json_payload: dict[str, Any], timeout: float) -> 
             except Exception:  # noqa: BLE001
                 data = await resp.text()
             return status, data
+
 
 @activity.defn
 async def call_serve_inference(request: InferenceRequest) -> InferenceResponse:
@@ -60,5 +66,6 @@ async def call_serve_inference(request: InferenceRequest) -> InferenceResponse:
     except Exception as exc:  # noqa: BLE001
         activity.logger.exception("Ray Serve inference call failed: %s", exc)
         return InferenceResponse(status_code=599, error=str(exc))
+
 
 __all__ = ["call_serve_inference"]

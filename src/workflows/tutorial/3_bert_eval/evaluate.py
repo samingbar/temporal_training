@@ -19,7 +19,6 @@ from src.workflows.train_tune.bert_eval.custom_types import BertEvalRequest
 
 async def main() -> None:
     """Execute a sample BERT evaluation workflow."""
-
     # 1. Connect to the Temporal server using the Pydantic data converter so
     #    that our Pydantic models can be sent over the wire transparently.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)

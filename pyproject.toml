@@ -12,8 +12,10 @@ dependencies = [
     "torch",
     "torchvision",
     "transformers[torch]",
-    "datasets",
+    "datasets==3.6.0",
     "google-genai>= 0.1.0",
+    "sentencepiece>=0.2.1",
+    "tokenizers>=0.22.1",
 ]
 
 [dependency-groups]

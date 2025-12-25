@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from temporalio import workflow
+
 with workflow.unsafe.imports_passed_through():
     from src.workflows.train_tune.bert_checkpointing.custom_types import (
         BertFineTuneConfig,
@@ -30,6 +31,7 @@ with workflow.unsafe.imports_passed_through():
         BertEvalResult,
         CoordinatorWorkflowInput,
     )
+
 
 @workflow.defn
 class CheckpointedBertTrainingWorkflow:
@@ -54,7 +56,7 @@ class CheckpointedBertTrainingWorkflow:
         """Run a single checkpoint-aware fine-tuning job."""
         # Derive a human-friendly, unique run identifier for this workflow run.
         # We base this on Temporal's run_id so each execution gets a fresh name.
-        
+
         run_id = f"bert-checkpointed-{workflow.info().run_id}"
         self.run_id = run_id
 
@@ -124,7 +126,7 @@ class BertInferenceWorkflow:
     """Workflow that runs inference using a fine-tuned BERT checkpoint."""
 
     @workflow.run
-    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:  # noqa: A002
+    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:
         """Execute BERT inference for a batch of texts."""
         # Handle both model instances and plain dicts defensively.
         if isinstance(input, dict):
@@ -157,7 +159,7 @@ class BertEvalWorkflow:
     """Workflow that evaluates a fine-tuned BERT model on a public dataset."""
 
     @workflow.run
-    async def run(self, input: BertEvalRequest) -> BertEvalResult:  # noqa: A002
+    async def run(self, input: BertEvalRequest) -> BertEvalResult:
         """Execute evaluation for a fine-tuned BERT run."""
         if isinstance(input, dict):
             run_id = input.get("run_id")
@@ -197,7 +199,8 @@ class BertEvalWorkflow:
         )
         return out
 
-@workflow.defn 
+
+@workflow.defn
 class CoordinatorWorkflow:
     """Workflow that coordinates checkpointed training, inference, and evaluation."""
 
@@ -239,10 +242,11 @@ class CoordinatorWorkflow:
                 batch_size=input.evaluation_config.batch_size,
                 use_gpu=bool(input.evaluation_config.use_gpu),
             ),
-            id=f"bert-eval-workflow-{self.run_id}"
+            id=f"bert-eval-workflow-{self.run_id}",
         )
         workflow.logger.info("Coordinator workflow completed")
         return result
+
     @workflow.signal
     def set_run_id(self, request: dict) -> None:
         """Receive the training run_id from the training workflow."""

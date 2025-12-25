@@ -12,15 +12,17 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from src.workflows.train_tune.bert_eval.checkpointed_training import (
-    BertEvalWorkflow,
-    CoordinatorWorkflow
+    CoordinatorWorkflow,
 )
-from src.workflows.train_tune.bert_eval.custom_types import CoordinatorWorkflowInput, BertFineTuneConfig, BertEvalRequest
+from src.workflows.train_tune.bert_eval.custom_types import (
+    BertEvalRequest,
+    BertFineTuneConfig,
+    CoordinatorWorkflowInput,
+)
 
 
 async def main() -> None:
     """Execute a sample BERT evaluation workflow."""
-
     # 1. Connect to the Temporal server using the Pydantic data converter so
     #    that our Pydantic models can be sent over the wire transparently.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
@@ -31,7 +33,7 @@ async def main() -> None:
     #      of examples for a fast, tutorial-friendly run.
 
     request = CoordinatorWorkflowInput(
-        fine_tune_config= BertFineTuneConfig(
+        fine_tune_config=BertFineTuneConfig(
             model_name="bert-base-uncased",
             dataset_name="glue",
             dataset_config_name="sst2",
@@ -50,7 +52,7 @@ async def main() -> None:
             max_eval_samples=1_000,
             max_seq_length=128,
             batch_size=32,
-            use_gpu=True
+            use_gpu=True,
         ),
     )
     # 3. Start the evaluation workflow and wait for the result.
