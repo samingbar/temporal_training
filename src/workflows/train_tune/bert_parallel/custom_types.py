@@ -11,8 +11,11 @@ Keeping the types in a dedicated module makes it easy to reuse them across
 workflows, activities, and client code while preserving a single source of
 truth for field names and validation rules.
 """
-from typing import List, Literal
+
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
 
 # ---------------------------------------------------------------------------
 # Checkpointing - related types
@@ -33,6 +36,7 @@ class DatasetSnapshotRequest(BaseModel):
     snapshot_dir: str = Field(
         default="./data_snapshots", description="Directory to store snapshots."
     )
+
 
 class DatasetSnapshotResult(BaseModel):
     """Result describing a materialized dataset snapshot.
@@ -73,6 +77,7 @@ class DatasetSnapshotResult(BaseModel):
         default=None,
         description="Optional schema hints such as text_field/label_field/task_type/num_labels.",
     )
+
 
 class CheckpointInfo(BaseModel):
     """Checkpoint information sent via signals."""
@@ -153,8 +158,12 @@ class BertFineTuneConfig(BaseModel):
         ),
     )
     text_field: str | None = Field(default=None, description="Primary text column name.")
-    text_pair_field: str | None = Field(default=None, description="Optional second text column for pair tasks.")
-    label_field: str | None = Field(default=None, description="Label column name (e.g., 'label', 'labels', 'target').")
+    text_pair_field: str | None = Field(
+        default=None, description="Optional second text column for pair tasks."
+    )
+    label_field: str | None = Field(
+        default=None, description="Label column name (e.g., 'label', 'labels', 'target')."
+    )
     task_type: Literal["auto", "classification", "regression"] = Field(
         default="auto",
         description="Task type. 'auto' infers from dataset features.",
@@ -210,7 +219,7 @@ class BertFineTuneResult(BaseModel):
         description="Final training loss reported by the Trainer.",
     )
 
-    eval_accuracy: dict[str,float] | None = Field(
+    eval_accuracy: dict[str, float] | None = Field(
         default=None,
         description="Evaluation metrics reported by Trainer.evaluate() (e.g., accuracy, f1, mse).",
     )
@@ -336,6 +345,8 @@ class BertEvalRequest(BaseModel):
             "coordinator workflow; if still unset at activity time, evaluation will fail."
         ),
     )
+
+
 class BertEvalResult(BaseModel):
     """Aggregate metrics from evaluating a fine-tuned BERT model."""
 
@@ -393,6 +404,7 @@ class BertExperimentOutput(BaseModel):
 
 class CoordinatorWorkflowConfig(BaseModel):
     """Input to the Coordinator Workflow."""
+
     run_id: str | None = Field(
         default=None, description="Recommended logical identifier for this fine-tuning run."
     )
@@ -406,9 +418,11 @@ class CoordinatorWorkflowConfig(BaseModel):
     evaluation_config: BertEvalRequest = Field(
         description="Configuration for evaluating the fine-tuned BERT model."
     )
+
+
 class CoordinatorWorkflowInput(BaseModel):
     """Input to the Coordinator Workflow."""
 
-    configs: List[CoordinatorWorkflowConfig] = Field(
+    configs: list[CoordinatorWorkflowConfig] = Field(
         description="List of configurations for the coordinator workflow to run and manage."
     )

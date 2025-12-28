@@ -11,21 +11,21 @@ The corresponding Temporal workflows orchestrate these activities, but all of
 the actual ML logic (dataset loading, tokenization, model forward passes, etc.)
 stays here so that workflow code can remain deterministic and replay-safe.
 """
-import os
-import datetime
+
 import asyncio
 import contextlib
+import datetime
 import hashlib
 import json
+import os
 import queue
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Final
-from httpcore import request
-from transformers import AutoTokenizer
+
 import numpy as np
-from transformers import AutoTokenizer, set_seed, TrainerCallback
+from transformers import AutoTokenizer, TrainerCallback, set_seed
 
 try:
     from datasets import ClassLabel
@@ -37,6 +37,8 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from src.workflows.train_tune.bert_parallel.custom_types import (
+    BertEvalRequest,
+    BertEvalResult,
     BertFineTuneRequest,
     BertFineTuneResult,
     BertInferenceRequest,
@@ -44,8 +46,6 @@ from src.workflows.train_tune.bert_parallel.custom_types import (
     CheckpointInfo,
     DatasetSnapshotRequest,
     DatasetSnapshotResult,
-    BertEvalRequest,
-    BertEvalResult,
 )
 
 try:  # Heavy ML imports are only needed when activities actually run.
@@ -94,7 +94,7 @@ class BertFineTuneActivities:
         self.label_field: str | None = None
         self.task_type: str | None = None  # "classification" | "regression"
         self.num_labels: int | None = None
-    
+
     def _infer_text_fields(self, sample: dict) -> None:
         """Infer (text_field, text_pair_field) from config overrides or dataset columns."""
         # 1) Config overrides win.
@@ -103,7 +103,15 @@ class BertFineTuneActivities:
             self.text_pair_field = getattr(self.config, "text_pair_field", None)
             return
 
-        COMMON_TEXT_COLS = ("text", "sentence", "content", "review", "question", "article", "prompt")
+        COMMON_TEXT_COLS = (
+            "text",
+            "sentence",
+            "content",
+            "review",
+            "question",
+            "article",
+            "prompt",
+        )
         COMMON_PAIR_COLS = (
             ("sentence1", "sentence2"),
             ("premise", "hypothesis"),
@@ -113,7 +121,12 @@ class BertFineTuneActivities:
 
         # 2) Common pair schemas.
         for a, b in COMMON_PAIR_COLS:
-            if a in sample and b in sample and isinstance(sample[a], str) and isinstance(sample[b], str):
+            if (
+                a in sample
+                and b in sample
+                and isinstance(sample[a], str)
+                and isinstance(sample[b], str)
+            ):
                 self.text_field, self.text_pair_field = a, b
                 return
 
@@ -153,7 +166,9 @@ class BertFineTuneActivities:
                     break
 
         if self.label_field is None:
-            raise KeyError(f"Couldn't infer a label column from dataset columns: {list(sample.keys())}")
+            raise KeyError(
+                f"Couldn't infer a label column from dataset columns: {list(sample.keys())}"
+            )
 
         # 2) Infer task type (or honor config override)
         cfg_task = getattr(self.config, "task_type", "auto")
@@ -161,13 +176,12 @@ class BertFineTuneActivities:
 
         if cfg_task in ("classification", "regression"):
             self.task_type = cfg_task
+        # Auto mode: if ClassLabel -> classification, if float -> regression, else classification.
+        elif ClassLabel is not None and isinstance(feature, ClassLabel):
+            self.task_type = "classification"
         else:
-            # Auto mode: if ClassLabel -> classification, if float -> regression, else classification.
-            if ClassLabel is not None and isinstance(feature, ClassLabel):
-                self.task_type = "classification"
-            else:
-                v = sample[self.label_field]
-                self.task_type = "regression" if isinstance(v, float) else "classification"
+            v = sample[self.label_field]
+            self.task_type = "regression" if isinstance(v, float) else "classification"
 
         # 3) Infer num_labels
         if self.task_type == "regression":
@@ -181,7 +195,6 @@ class BertFineTuneActivities:
             # simple heuristic: gather a small set of unique labels from the first ~1k examples
             # (keeps it simple; avoids scanning the whole dataset)
             self.num_labels = None  # caller can fill using dataset slice if desired
-    
 
     def compute_metrics(self, eval_pred):
         logits, labels = eval_pred
@@ -194,7 +207,11 @@ class BertFineTuneActivities:
             labels = labels.reshape(-1)
 
         # Regression: common HF convention is num_labels == 1
-        if getattr(self.config, "num_labels", None) == 1 or logits.ndim == 1 or logits.shape[-1] == 1:
+        if (
+            getattr(self.config, "num_labels", None) == 1
+            or logits.ndim == 1
+            or logits.shape[-1] == 1
+        ):
             preds = logits.reshape(-1)
             mse = float(np.mean((preds - labels) ** 2))
             rmse = float(np.sqrt(mse))
@@ -214,7 +231,9 @@ class BertFineTuneActivities:
 
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+            f1 = (
+                (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+            )
 
             metrics.update({"precision": precision, "recall": recall, "f1": f1})
 
@@ -230,7 +249,9 @@ class BertFineTuneActivities:
         text_field = self.text_field
         text_pair_field = self.text_pair_field
 
-        if text_field not in batch or (text_pair_field is not None and text_pair_field not in batch):
+        if text_field not in batch or (
+            text_pair_field is not None and text_pair_field not in batch
+        ):
             # Re-infer from the current batch's first example.
             sample: dict = {}
             for k, v in batch.items():
@@ -259,7 +280,8 @@ class BertFineTuneActivities:
             truncation=True,
             max_length=self.config.max_seq_length,
         )
-    def _cast_labels(self,batch: dict) -> dict:
+
+    def _cast_labels(self, batch: dict) -> dict:
         ys = batch["labels"]
         if self.task_type == "regression":
             return {"labels": [float(y) for y in ys]}
@@ -281,7 +303,7 @@ class BertFineTuneActivities:
         if torch is None or load_dataset is None:
             # pragma: no cover - only hit when deps are actually missing
             raise RuntimeError(TRANSFORMERS_IMPORT_MESSAGE)
-        
+
         start_time = time.perf_counter()
         self.config = request.config
 
@@ -306,14 +328,15 @@ class BertFineTuneActivities:
 
         schema_sample = schema_split[0]  # just inspect columns/types
 
-
         # Infer the primary text field for this dataset (e.g. "sentence" for GLUE,
         # "text" for IMDB) so tokenization works across multiple sources.
-        try: 
+        try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name)
-        
-        except Exception as e:
-            activity.logger.warning("Falling back to slow tokenizer for %s", self.config.model_name, exc_info=True)
+
+        except Exception:
+            activity.logger.warning(
+                "Falling back to slow tokenizer for %s", self.config.model_name, exc_info=True
+            )
             self.tokenizer = AutoTokenizer.from_pretrained(self.config.model_name, use_fast=False)
 
         # Infer Text
@@ -326,7 +349,7 @@ class BertFineTuneActivities:
         if self.task_type == "classification" and self.num_labels is None:
             probe_n = min(1000, len(schema_split))
             label_probe = schema_split.select(range(probe_n))[self.label_field]
-            self.num_labels = int(len(set(label_probe)))
+            self.num_labels = len(set(label_probe))
 
         # Apply the tokenizer across the dataset; `batched=True` lets HF process
         # multiple rows at once for better throughput.
@@ -336,14 +359,13 @@ class BertFineTuneActivities:
         if self.label_field != "labels":
             tokenized_datasets = tokenized_datasets.rename_column(self.label_field, "labels")
 
-            
         tokenized_datasets = tokenized_datasets.map(self._cast_labels, batched=True)
         # Tell Datasets to yield PyTorch tensors for the columns the Trainer needs.
         tokenized_datasets.set_format(
             type="torch",
             columns=["input_ids", "attention_mask", "labels"],
         )
- 
+
         # ------------------------------------------------------------------
         # 3. Prepare train and eval datasets, applying any sub-sampling requested.
         eval_dataset = (
@@ -351,8 +373,8 @@ class BertFineTuneActivities:
             or tokenized_datasets.get("validation_matched")
             or tokenized_datasets.get("dev")
             or tokenized_datasets.get("val")
-            )
-        
+        )
+
         if eval_dataset is None and "train" in tokenized_datasets:
             split = tokenized_datasets["train"].train_test_split(
                 test_size=0.1,
@@ -370,10 +392,16 @@ class BertFineTuneActivities:
             if eval_dataset is not None:
                 eval_dataset = eval_dataset.shuffle(seed=self.config.seed)
 
-        if self.config.max_train_samples is not None and self.config.max_train_samples < len(train_dataset):
+        if self.config.max_train_samples is not None and self.config.max_train_samples < len(
+            train_dataset
+        ):
             train_dataset = train_dataset.select(range(self.config.max_train_samples))
 
-        if eval_dataset is not None and self.config.max_eval_samples is not None and self.config.max_eval_samples < len(eval_dataset):
+        if (
+            eval_dataset is not None
+            and self.config.max_eval_samples is not None
+            and self.config.max_eval_samples < len(eval_dataset)
+        ):
             eval_dataset = eval_dataset.select(range(self.config.max_eval_samples))
 
         # 4. Construct the classification head on top of the base encoder.
@@ -383,9 +411,9 @@ class BertFineTuneActivities:
         )
 
         if self.task_type == "regression":
-                model.config.problem_type = "regression"
+            model.config.problem_type = "regression"
         else:
-                model.config.problem_type = "single_label_classification"
+            model.config.problem_type = "single_label_classification"
 
         # Make regression explicit
         if self.task_type == "regression":
@@ -434,7 +462,6 @@ class BertFineTuneActivities:
             if existing_checkpoints:
                 resume_path = str(existing_checkpoints[-1])
 
-
         # Attach a callback that enqueues checkpoint metadata on each save, if requested.
         if checkpoint_queue is not None:
             trainer.add_callback(
@@ -460,7 +487,7 @@ class BertFineTuneActivities:
                 train_result = trainer.train()
             else:
                 raise
-        
+
         eval_metrics: dict[str, float] | None = None
 
         if eval_dataset is not None:
@@ -468,9 +495,7 @@ class BertFineTuneActivities:
 
             # Keep only numeric scalars and normalize to plain floats
             eval_metrics = {
-                k: float(v)
-                for k, v in raw_metrics.items()
-                if isinstance(v, (int, float))
+                k: float(v) for k, v in raw_metrics.items() if isinstance(v, (int, float))
             }
 
         # Persist the final fine-tuned model and tokenizer so that the inference
@@ -521,7 +546,7 @@ class BertFineTuneActivities:
         #   enables heartbeat timeouts and cancellation handling.
 
         # Shared queue for checkpoint updates produced by the Trainer callback.
-        checkpoint_queue: "queue.Queue[CheckpointInfo]" = queue.Queue()
+        checkpoint_queue: queue.Queue[CheckpointInfo] = queue.Queue()
 
         # Best-effort initialization of a workflow handle used for signaling.
         signal_handle = None
@@ -637,11 +662,12 @@ class BertInferenceActivities:
         model_dir = (base_dir / request.run_id).resolve()
 
         if not model_dir.exists():
-            raise FileNotFoundError(
-                f"Model directory not found: {model_dir}\n")
+            raise FileNotFoundError(f"Model directory not found: {model_dir}\n")
 
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
-        model = AutoModelForSequenceClassification.from_pretrained(str(model_dir), local_files_only=True)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            str(model_dir), local_files_only=True
+        )
         model.to(device)
         model.eval()
 
@@ -707,7 +733,7 @@ class BertCheckpointingActivities:
         raw_datasets = load_dataset(
             request.dataset_name,
             request.dataset_config,
-            trust_remote_code=True, # Turn off to disable loading custom dataset scripts
+            trust_remote_code=True,  # Turn off to disable loading custom dataset scripts
         )
 
         train_dataset = raw_datasets["train"]
@@ -819,7 +845,6 @@ class BertEvalActivities:
         and computes simple accuracy. All I/O and ML details live here so the
         Temporal workflow layer can remain deterministic.
         """
-
         if torch is None or load_dataset is None:
             raise RuntimeError(TRANSFORMERS_IMPORT_MESSAGE)
 
@@ -843,11 +868,12 @@ class BertEvalActivities:
         model_dir = Path(request.model_path).resolve()
         if not model_dir.exists():
             raise FileNotFoundError(
-                f"Model directory not found: {model_dir}\n"
-                f"Current working directory: {Path.cwd()}\n"
+                f"Model directory not found: {model_dir}\nCurrent working directory: {Path.cwd()}\n"
             )
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
-        model = AutoModelForSequenceClassification.from_pretrained(str(model_dir), local_files_only=True)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            str(model_dir), local_files_only=True
+        )
         model.to(device)
         model.eval()
 

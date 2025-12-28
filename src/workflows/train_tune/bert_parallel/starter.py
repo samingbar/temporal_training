@@ -12,14 +12,14 @@ import random
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from src.workflows.train_tune.bert_parallel.workflows import (
-    CoordinatorWorkflow,
-)
 from src.workflows.train_tune.bert_parallel.custom_types import (
     BertEvalRequest,
     BertFineTuneConfig,
+    CoordinatorWorkflowConfig,
     CoordinatorWorkflowInput,
-    CoordinatorWorkflowConfig
+)
+from src.workflows.train_tune.bert_parallel.workflows import (
+    CoordinatorWorkflow,
 )
 
 
@@ -42,7 +42,7 @@ async def main() -> None:
             use_gpu=True,
             max_train_samples=3_000,
             max_eval_samples=2_000,
-            seed=random.randint(0, 10000)
+            seed=random.randint(0, 10000),
         ),
         evaluation_config=BertEvalRequest(
             dataset_name="glue",
@@ -67,7 +67,7 @@ async def main() -> None:
             use_gpu=True,
             max_train_samples=3_000,
             max_eval_samples=2_000,
-            seed=random.randint(0, 10000)
+            seed=random.randint(0, 10000),
         ),
         evaluation_config=BertEvalRequest(
             dataset_name="glue",
@@ -92,7 +92,7 @@ async def main() -> None:
             use_gpu=True,
             max_train_samples=5_000,
             max_eval_samples=2_000,
-            seed=random.randint(0, 10000)
+            seed=random.randint(0, 10000),
         ),
         evaluation_config=BertEvalRequest(
             dataset_name="imdb",
@@ -111,9 +111,9 @@ async def main() -> None:
             dataset_name="glue",
             dataset_config_name="sst2",
             num_epochs=2,
-            batch_size=4,          # MPS-safe
+            batch_size=4,  # MPS-safe
             learning_rate=5e-5,
-            max_seq_length=64,     # MPS-safe
+            max_seq_length=64,  # MPS-safe
             use_gpu=True,
             max_train_samples=2_000,
             max_eval_samples=1_000,
@@ -143,17 +143,16 @@ async def main() -> None:
         dataset_snapshot=None,  # or pass a DatasetSnapshotResult if you want reproducibility
     )
 
-    
-     #### MiniLM-L12-H384-uncased SLM configuration for testing ####
+    #### MiniLM-L12-H384-uncased SLM configuration for testing ####
     config_5 = CoordinatorWorkflowConfig(
         fine_tune_config=BertFineTuneConfig(
             model_name="microsoft/MiniLM-L12-H384-uncased",
             dataset_name="glue",
             dataset_config_name="sst2",
             num_epochs=2,
-            batch_size=4,          # still MPS-safe
-            learning_rate=3e-5,    # MiniLM often prefers slightly lower LR
-            max_seq_length=64,     # safe starting point
+            batch_size=4,  # still MPS-safe
+            learning_rate=3e-5,  # MiniLM often prefers slightly lower LR
+            max_seq_length=64,  # safe starting point
             use_gpu=True,
             max_train_samples=2_000,
             max_eval_samples=1_000,
@@ -189,9 +188,9 @@ async def main() -> None:
             dataset_name="glue",
             dataset_config_name="sst2",
             num_epochs=2,
-            batch_size=2,          # DeBERTa tends to be heavier on memory (safer on MPS)
-            learning_rate=2e-5,    # common stable starting LR for DeBERTa fine-tuning
-            max_seq_length=64,     # start safe; bump to 96/128 once stable
+            batch_size=2,  # DeBERTa tends to be heavier on memory (safer on MPS)
+            learning_rate=2e-5,  # common stable starting LR for DeBERTa fine-tuning
+            max_seq_length=64,  # start safe; bump to 96/128 once stable
             use_gpu=True,
             max_train_samples=2_000,
             max_eval_samples=1_000,
@@ -220,12 +219,12 @@ async def main() -> None:
     config_7 = CoordinatorWorkflowConfig(
         fine_tune_config=BertFineTuneConfig(
             model_name="allenai/scibert_scivocab_uncased",
-            dataset_name="scicite",          # start with SST-2 to validate pipeline
+            dataset_name="scicite",  # start with SST-2 to validate pipeline
             dataset_config_name="default",
-            num_epochs=2,                 # SciBERT converges quickly
-            batch_size=4,                 # heavier than BERT-base on MPS
-            learning_rate=2e-5,           # common SciBERT fine-tuning LR
-            max_seq_length=128,            # safe baseline (raise later)
+            num_epochs=2,  # SciBERT converges quickly
+            batch_size=4,  # heavier than BERT-base on MPS
+            learning_rate=2e-5,  # common SciBERT fine-tuning LR
+            max_seq_length=128,  # safe baseline (raise later)
             use_gpu=True,
             max_train_samples=2_000,
             max_eval_samples=1_000,
@@ -238,7 +237,7 @@ async def main() -> None:
             # task_type="auto",
         ),
         evaluation_config=BertEvalRequest(
-            run_id=None,                  # coordinator fills this in
+            run_id=None,  # coordinator fills this in
             dataset_name="scicite",
             dataset_config_name="default",
             split="validation",
@@ -248,13 +247,10 @@ async def main() -> None:
             use_gpu=True,
             # model_path / model_uri populated by coordinator after training
         ),
-        dataset_snapshot=None,            # add snapshot later for reproducibility
+        dataset_snapshot=None,  # add snapshot later for reproducibility
     )
 
-
-    request = CoordinatorWorkflowInput(
-       configs=[config_7]
-       )
+    request = CoordinatorWorkflowInput(configs=[config_7])
     # 3. Start the evaluation workflow and wait for the result.
     result = await client.execute_workflow(
         CoordinatorWorkflow.run,
@@ -267,13 +263,7 @@ async def main() -> None:
     results = result if isinstance(result, (list, tuple)) else [result]
 
     print("\n=== BERT evaluation summary ===")
-    header = (
-        f"{'run_id':<36} "
-        f"{'dataset':<20} "
-        f"{'split':<10} "
-        f"{'examples':>10} "
-        f"{'accuracy':>9}"
-    )
+    header = f"{'run_id':<36} {'dataset':<20} {'split':<10} {'examples':>10} {'accuracy':>9}"
     print(header)
     print("-" * len(header))
 

@@ -21,4 +21,5 @@ bin/
 
 #Training Outputs
 bert_runs/
+data_snapshots/
 cifar10_runs/

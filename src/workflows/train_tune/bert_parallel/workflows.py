@@ -15,21 +15,23 @@ import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
+
 with workflow.unsafe.imports_passed_through():
     from src.workflows.train_tune.bert_parallel.custom_types import (
         BertEvalRequest,
         BertEvalResult,
-        CoordinatorWorkflowInput,
-        CoordinatorWorkflowConfig,
         BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,
         BertInferenceRequest,
         BertInferenceResult,
         CheckpointInfo,
+        CoordinatorWorkflowConfig,
+        CoordinatorWorkflowInput,
         DatasetSnapshotRequest,
         DatasetSnapshotResult,
     )
+
 
 @workflow.defn
 class CheckpointedBertTrainingWorkflow:
@@ -70,8 +72,6 @@ class CheckpointedBertTrainingWorkflow:
             config.dataset_name,
             config.dataset_config_name,
         )
-
-       
 
         # Step 1: Materialize (or reuse) a dataset snapshot for this configuration.
         snapshot_request = DatasetSnapshotRequest(
@@ -132,7 +132,7 @@ class BertInferenceWorkflow:
     """Workflow that runs inference using a fine-tuned BERT checkpoint."""
 
     @workflow.run
-    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:  # noqa: A002
+    async def run(self, input: BertInferenceRequest) -> BertInferenceResult:
         """Execute BERT inference for a batch of texts."""
         # Handle both model instances and plain dicts defensively.
         if isinstance(input, dict):
@@ -165,7 +165,7 @@ class BertEvalWorkflow:
     """Workflow that evaluates a fine-tuned BERT model on a public dataset."""
 
     @workflow.run
-    async def run(self, input: BertEvalRequest) -> BertEvalResult:  # noqa: A002
+    async def run(self, input: BertEvalRequest) -> BertEvalResult:
         """Execute evaluation for a fine-tuned BERT run."""
         if isinstance(input, dict):
             run_ids = input.get("run_ids")
@@ -205,7 +205,8 @@ class BertEvalWorkflow:
         )
         return out
 
-@workflow.defn 
+
+@workflow.defn
 class CoordinatorWorkflow:
     """Workflow that coordinates checkpointed training, inference, and evaluation."""
 
@@ -243,7 +244,7 @@ class CoordinatorWorkflow:
     async def run(self, input: CoordinatorWorkflowInput) -> list[BertEvalResult]:
         """Execute the coordinator workflow and return per-config evaluation results."""
         workflow.logger.info("Coordinator workflow started")
-        
+
         for config in input.configs:
             self.set_run_id(cfg=config)
             run = workflow.execute_child_workflow(
@@ -261,16 +262,13 @@ class CoordinatorWorkflow:
                     max_train_samples=config.fine_tune_config.max_train_samples,
                     max_eval_samples=config.fine_tune_config.max_eval_samples,
                 ),
-
                 id=f"checkpointed-bert-training-workflow-{config.run_id}",
                 task_queue="bert-training-task-queue",
             )
             self.run_pointers.append(run)
 
-            
         await asyncio.gather(*self.run_pointers)
         for config in input.configs:
-            
             eval_pointer = workflow.execute_child_workflow(
                 BertEvalWorkflow.run,
                 BertEvalRequest(
@@ -284,7 +282,7 @@ class CoordinatorWorkflow:
                     use_gpu=bool(config.evaluation_config.use_gpu),
                     model_path=config.evaluation_config.model_path,
                 ),
-                id=f"bert-eval-workflow-{config.run_id}"
+                id=f"bert-eval-workflow-{config.run_id}",
             )
             self.eval_pointers.append(eval_pointer)
         results = await asyncio.gather(*self.eval_pointers)

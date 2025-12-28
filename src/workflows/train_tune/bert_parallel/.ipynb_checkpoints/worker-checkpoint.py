@@ -16,6 +16,7 @@ from src.workflows.train_tune.bert_parallel.workflows import (
     CoordinatorWorkflow,
 )
 
+
 async def main() -> None:
     """Start a worker for BERT evaluation workflows."""
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
@@ -30,6 +31,7 @@ async def main() -> None:
         activity_executor=ThreadPoolExecutor(5),
     )
     await worker.run()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
