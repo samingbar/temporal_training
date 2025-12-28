@@ -85,6 +85,7 @@ config_2 = CoordinatorWorkflowConfig(
 )
 
 # Sample 3 {Model: BERT Uncased - Dataset: IMDB}
+seed = random.randint(0, 10000)
 config_3 = CoordinatorWorkflowConfig(
     fine_tune_config=BertFineTuneConfig(
         model_name="bert-base-uncased",
@@ -97,7 +98,7 @@ config_3 = CoordinatorWorkflowConfig(
         use_gpu=True,
         max_train_samples=5_000,
         max_eval_samples=2_000,
-        seed=random.randint(0, 10000),
+        seed=seed,
     ),
     evaluation_config=BertEvalRequest(
         dataset_name="imdb",
@@ -107,9 +108,11 @@ config_3 = CoordinatorWorkflowConfig(
         max_seq_length=256,
         batch_size=32,
         use_gpu=True,
+        seed=seed,
     ),
 )
 # Sample 4: {Model: DistilBERT - Dataset: Glue}
+seed = random.randint(0, 10000)
 config_4 = CoordinatorWorkflowConfig(
     fine_tune_config=BertFineTuneConfig(
         model_name="distilbert-base-uncased",
@@ -123,7 +126,7 @@ config_4 = CoordinatorWorkflowConfig(
         max_train_samples=2_000,
         max_eval_samples=1_000,
         shuffle_before_select=True,
-        seed=42,
+        seed=seed,
         # optional overrides if you added them:
         # text_field=None,
         # text_pair_field=None,
@@ -140,6 +143,7 @@ config_4 = CoordinatorWorkflowConfig(
         max_seq_length=64,
         batch_size=32,
         use_gpu=True,
+        seed=seed,
         # if you changed eval to require model_uri/model_path, leave it unset here
         # and let the coordinator populate it from the training result.
         # model_path=None,
@@ -149,6 +153,7 @@ config_4 = CoordinatorWorkflowConfig(
 )
 
 # Sample 5: {Model: MiniLM-L12-H384-uncased - Dataset: Glue}
+seed = random.randint(0, 10000)
 config_5 = CoordinatorWorkflowConfig(
     fine_tune_config=BertFineTuneConfig(
         model_name="microsoft/MiniLM-L12-H384-uncased",
@@ -162,7 +167,7 @@ config_5 = CoordinatorWorkflowConfig(
         max_train_samples=2_000,
         max_eval_samples=1_000,
         shuffle_before_select=True,
-        seed=42,
+        seed=seed,
         # Optional schema overrides (usually not needed for GLUE)
         # text_field=None,
         # text_pair_field=None,
@@ -179,6 +184,7 @@ config_5 = CoordinatorWorkflowConfig(
         max_seq_length=64,
         batch_size=32,
         use_gpu=True,
+        seed=seed,
         # If your eval requires an explicit model path/URI,
         # leave it unset here and let the coordinator fill it.
         # model_path=None,
@@ -187,6 +193,7 @@ config_5 = CoordinatorWorkflowConfig(
     dataset_snapshot=None,  # pass a snapshot if you want strict reproducibility
 )
 # Sample 6: {Model: DeBERTa-v3-small - Dataset: Glue}
+seed = random.randint(0, 10000)
 config_6 = CoordinatorWorkflowConfig(
     fine_tune_config=BertFineTuneConfig(
         model_name="microsoft/deberta-v3-small",
@@ -200,7 +207,7 @@ config_6 = CoordinatorWorkflowConfig(
         max_train_samples=2_000,
         max_eval_samples=1_000,
         shuffle_before_select=True,
-        seed=42,
+        seed=seed,
         # Optional schema overrides (usually not needed for GLUE)
         # text_field=None,
         # text_pair_field=None,
@@ -216,6 +223,7 @@ config_6 = CoordinatorWorkflowConfig(
         max_seq_length=64,
         batch_size=32,
         use_gpu=True,
+        seed=seed,
         # model_path/model_uri left for coordinator to populate from training result
     ),
     dataset_snapshot=None,
@@ -253,7 +261,7 @@ ladder_id = uuid.uuid4()  # Replace with custom naming logic as desired.
 # Sample 1: SciBERT Scaling Ladder
 ladder_config_1 = SweepRequest(
     experiment_id=f"Bert-ladder-sweep-{ladder_id}",
-    base=config_7,
+    base=config_6,
     space=SweepSpace(
         learning_rate=(5e-5, 1e-5),
         batch_size=[2, 32],

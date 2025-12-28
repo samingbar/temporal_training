@@ -18,7 +18,7 @@ and focus purely on orchestration.
 """
 
 from __future__ import annotations
-
+import random
 import asyncio
 import math
 from collections import Counter
@@ -317,6 +317,7 @@ class CoordinatorWorkflow:
                     batch_size=config.evaluation_config.batch_size,
                     use_gpu=bool(config.evaluation_config.use_gpu),
                     model_path=config.evaluation_config.model_path,
+                    seed=config.evaluation_config.seed,
                 ),
                 id=f"bert-eval-workflow-{config.run_id}",
             )
@@ -665,7 +666,13 @@ class LadderSweepWorkflow:
 
                 c.fine_tune_config.num_epochs = epochs
                 c.fine_tune_config.max_train_samples = max_train
-                c.fine_tune_config.seed = req.seed + stage_idx * 100_000 + j
+                seed = await workflow.execute_activity(
+                    "set_seed",
+                    req.seed,
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                c.fine_tune_config.seed = seed
+                c.evaluation_config.seed = seed
 
                 stage_cfgs.append(c)
 
