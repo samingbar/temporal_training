@@ -20,6 +20,19 @@ At a high level:
 - **`starter.py`** is a tiny CLI entrypoint that kicks off a ladder-style sweep
   and prints a concise summary of results.
 
+## Features
+This workflow highlights temporal capabilities, including:
+- **Resource Isolation**: isolating code for infra and science teams into dedicated activity classes, separate from orchestration workflows or worker code. 
+- **Debug & Continue**: Debug crashes, bring down your workers, delpoy a new version, and continue right where your sweep left off without missing a beat
+- **Dataset Checkpointing**: Datasets are persisted before training, allowing you to reproduce a past run exactly using only the information captured by temporal and the snapshotted dataset. This also ensures reproducibility is not lost if the dataset is later updated. 
+- **Flexible Sweeping System**: This system works arcross multiple models and datasets. Take a look at the sample configs in starter.py to see the different SLMs used during testing. 
+
+- **Live Updates**: Use signals to asynchronously update references to the latest checkpoints, dataset snapshots, etc during training. Here, we demonstrate how to do this by passing a ref to each new checkpoint to the Workflow, from the training activity. You can query this live or after workflow completion to locate the most up-to-date checkpoint. 
+
+- **TPE Based Scaling Ladders**: See how Temporal takes the stress away during large experimentation runs as a context manager, ensuring large and complicated orchestration happens reliably and consistently. Temporal is not limited to acyclic workflows like DAGs, and can be used to code looping behaviors, including loops with human in the loop steps, with ease. 
+
+This demo is just a starting point. Take a look and don't hesitate to ask questions!! 
+
 ## Prerequisites
 
 - A running Temporal server (for local development, `temporal server start-dev`)
@@ -114,4 +127,3 @@ Because all randomness flows through Temporal's deterministic RNG, you can
 re-run the same sweep with the same `SweepRequest.seed` and expect identical
 trial configurations and ordering, which makes this a good template for
 reproducible experimentation.
-

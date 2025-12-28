@@ -18,12 +18,15 @@ and focus purely on orchestration.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-import math
+
 import asyncio
-from datetime import timedelta
+import math
 from collections import Counter
+from dataclasses import dataclass
+from datetime import timedelta
+
 from temporalio import workflow
+
 with workflow.unsafe.imports_passed_through():
     from src.workflows.train_tune.bert_sweeps.custom_types import (
         BertEvalRequest,
@@ -31,18 +34,17 @@ with workflow.unsafe.imports_passed_through():
         BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,
-        BertInferenceRequest,
-        BertInferenceResult,
         CheckpointInfo,
         CoordinatorWorkflowConfig,
         CoordinatorWorkflowInput,
         DatasetSnapshotRequest,
         DatasetSnapshotResult,
         SweepRequest,
-        TrialResult,
         SweepResult,
-        SweepSpace
+        SweepSpace,
+        TrialResult,
     )
+
 
 # ----------------------------------------------------------------------------------
 # Checkpointed BERT Training Workflow
@@ -157,6 +159,7 @@ class CheckpointedBertTrainingWorkflow:
             return BertFineTuneResult(**result)
         return result
 
+
 # ----------------------------------------------------------------------------------
 # BERT Evaluation Workflow
 # ----------------------------------------------------------------------------------
@@ -206,6 +209,8 @@ class BertEvalWorkflow:
         )
 
         return out
+
+
 # ----------------------------------------------------------------------------------
 # Parallel Run Coordination Workflow (No Sweeping, No Ladder)
 # ----------------------------------------------------------------------------------
@@ -319,6 +324,7 @@ class CoordinatorWorkflow:
         results = await asyncio.gather(*self.eval_pointers)
         return results
 
+
 # ----------------------------------------------------------------------------------
 # Sweep Workflow (No Ladder)
 # ----------------------------------------------------------------------------------
@@ -365,7 +371,9 @@ class SweepWorkflow:
             cfg.fine_tune_config.learning_rate = float(
                 math.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
             )
-            workflow.logger.info("Trial %s: sampled learning_rate=%.6f", i, cfg.fine_tune_config.learning_rate)
+            workflow.logger.info(
+                "Trial %s: sampled learning_rate=%.6f", i, cfg.fine_tune_config.learning_rate
+            )
             trial_cfgs.append(cfg)
 
         eval_results: list[BertEvalResult] = await workflow.execute_child_workflow(
@@ -400,6 +408,7 @@ class SweepWorkflow:
             leaderboard=trials,
         )
 
+
 @dataclass
 class _TrialObs:
     run_id: str
@@ -407,6 +416,7 @@ class _TrialObs:
     stage_idx: int
     score: float
     """Lightweight observation used to fit TPE-style proposal distributions."""
+
 
 # ----------------------------------------------------------------------------------
 # Scaling Ladder Workflow
@@ -434,7 +444,9 @@ class LadderSweepWorkflow:
         return max(eps, min(1.0 - eps, p))
 
     @staticmethod
-    async def _run_one_cfg(sem: asyncio.Semaphore, cfg: CoordinatorWorkflowConfig, stage_label: str) -> BertEvalResult:
+    async def _run_one_cfg(
+        sem: asyncio.Semaphore, cfg: CoordinatorWorkflowConfig, stage_label: str
+    ) -> BertEvalResult:
         """Run a single coordinator config, respecting the shared semaphore."""
         async with sem:
             results: list[BertEvalResult] = await workflow.execute_child_workflow(
@@ -482,7 +494,6 @@ class LadderSweepWorkflow:
         c = Counter(getattr(o.cfg.fine_tune_config, attr) for o in obs)
         return {v: float(c.get(v, 0) + 1) for v in choices}  # Laplace smoothing
 
-
     @staticmethod
     def _tpe_suggest(
         rng,
@@ -512,7 +523,9 @@ class LadderSweepWorkflow:
             selected_max_seq_length = rng.choice(space.max_seq_length)
             cfg.fine_tune_config.max_seq_length = selected_max_seq_length
             cfg.evaluation_config.max_seq_length = selected_max_seq_length
-            workflow.logger.info("Random TPE trial: sampled max_seq_length=%s", selected_max_seq_length)
+            workflow.logger.info(
+                "Random TPE trial: sampled max_seq_length=%s", selected_max_seq_length
+            )
 
             selected_epochs = rng.choice(space.num_epochs)
             cfg.fine_tune_config.num_epochs = selected_epochs
@@ -523,7 +536,9 @@ class LadderSweepWorkflow:
             cfg.fine_tune_config.learning_rate = float(
                 math.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
             )
-            workflow.logger.info("Random TPE trial: sampled learning_rate=%.6f", cfg.fine_tune_config.learning_rate)
+            workflow.logger.info(
+                "Random TPE trial: sampled learning_rate=%.6f", cfg.fine_tune_config.learning_rate
+            )
             return cfg
 
         sorted_hist = sorted(history, key=lambda o: o.score, reverse=True)
@@ -558,7 +573,9 @@ class LadderSweepWorkflow:
 
         for _ in range(n_candidates):
             bs = LadderSweepWorkflow._sample_categorical_weighted(rng, space.batch_size, good_bs_w)
-            ms = LadderSweepWorkflow._sample_categorical_weighted(rng, space.max_seq_length, good_ms_w)
+            ms = LadderSweepWorkflow._sample_categorical_weighted(
+                rng, space.max_seq_length, good_ms_w
+            )
 
             # Box-Muller using rng (deterministic)
             u1 = LadderSweepWorkflow._clip(rng.random())
@@ -681,7 +698,9 @@ class LadderSweepWorkflow:
             by_run = {r.run_id: r for r in stage_results}
             for cfg in stage_cfgs:
                 r = by_run[cfg.run_id]
-                history.append(_TrialObs(run_id=cfg.run_id, cfg=cfg, stage_idx=stage_idx, score=r.accuracy))
+                history.append(
+                    _TrialObs(run_id=cfg.run_id, cfg=cfg, stage_idx=stage_idx, score=r.accuracy)
+                )
 
             # Select survivors for the next rung.
             top = last_ranked[:keep_k]
@@ -696,7 +715,7 @@ class LadderSweepWorkflow:
 
             # Early exit only if (a) we are at the final rung, in which case
             # we simply return the last ranked results.
-            is_last_stage = (stage_idx == len(stages) - 1)
+            is_last_stage = stage_idx == len(stages) - 1
             if is_last_stage:
                 return last_ranked
 
@@ -725,7 +744,7 @@ class LadderSweepWorkflow:
 
         best_result = await LadderSweepWorkflow._run_one_cfg(sem, best_cfg, "best-fallback")
         return [best_result]
-    
+
 
 class RedundantWorkflow:
     async def run(req: SweepRequest) -> list[BertEvalResult]:
@@ -740,7 +759,7 @@ class RedundantWorkflow:
 
             # Deterministic run_id per trial
             run_id = f"{req.experiment_id}-{i:04d}"
-            
+
             # Set run_id everywhere
             cfg.run_id = run_id
             cfg.fine_tune_config.run_id = run_id
@@ -750,7 +769,7 @@ class RedundantWorkflow:
             # Set initial parameters
             # ---------------------------------------
 
-            #Batch Size 
+            # Batch Size
             initial_batch_size = rng.choice(req.space.batch_size)
             cfg.fine_tune_config.batch_size = initial_batch_size
             cfg.evaluation_config.batch_size = initial_batch_size
@@ -781,14 +800,14 @@ class RedundantWorkflow:
         # Feel free to tune the parameters and number of stages below:
         stages = [
             # (epochs, max_train_samples, keep_top_k)
-            (1, 1000,  max(1, req.num_trials)),
+            (1, 1000, max(1, req.num_trials)),
             (2, 2000, max(1, req.num_trials // 4)),
             (3, 3000, max(1, req.num_trials // 8)),
             (4, req.base.fine_tune_config.max_train_samples, 1),
         ]
 
         survivors = trial_cfgs
-        
+
         for stage_idx, (epochs, max_train, keep_k) in enumerate(stages):
             workflow.logger.info(
                 "Ladder stage %s: %s trials, epochs=%s, max_train_samples=%s, keep_top_k=%s",
@@ -799,9 +818,6 @@ class RedundantWorkflow:
                 keep_k,
             )
 
-
-        
-
             # mutate budgets for this stage (keeping same run_id so checkpoints can be reused)
             stage_cfgs: list[CoordinatorWorkflowConfig] = []
             for cfg in survivors:
@@ -809,7 +825,6 @@ class RedundantWorkflow:
                 c.fine_tune_config.num_epochs = epochs
                 c.fine_tune_config.max_train_samples = max_train
                 stage_cfgs.append(c)
-
 
             # run training+eval for this stage (still uses your CoordinatorWorkflow)
             stage_results: list[BertEvalResult] = await workflow.execute_child_workflow(

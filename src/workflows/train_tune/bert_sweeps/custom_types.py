@@ -327,7 +327,7 @@ class BertEvalRequest(BaseModel):
         default=128,
         description="Maximum sequence length for tokenization during evaluation.",
     )
-    batch_size: int= Field(
+    batch_size: int = Field(
         gt=0,
         le=256,
         default=32,
@@ -346,10 +346,7 @@ class BertEvalRequest(BaseModel):
         ),
     )
 
-    
-    seed: int = Field(
-        default=42
-    )
+    seed: int = Field(default=42)
 
 
 class BertEvalResult(BaseModel):

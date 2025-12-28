@@ -7,23 +7,31 @@ import json
 import os
 import queue
 import time
-import torch
-import numpy as np
-from datasets.utils import logging as ds_logging
 from datetime import datetime
 from pathlib import Path
 from typing import Final
-from torch import device
-from unittest import result
+
+import numpy as np
+import torch
+
 try:
     from datasets import ClassLabel
 except Exception:
     ClassLabel = None
+from datasets import load_dataset
 from temporalio import activity
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.exceptions import ApplicationError
-from datasets import load_dataset
+from transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    Trainer,
+    TrainerCallback,
+    TrainingArguments,
+    set_seed,
+)
+
 from src.workflows.train_tune.bert_parallel.custom_types import (
     BertEvalRequest,
     BertEvalResult,
@@ -33,14 +41,6 @@ from src.workflows.train_tune.bert_parallel.custom_types import (
     DatasetSnapshotRequest,
     DatasetSnapshotResult,
 )
-from transformers import (
-        AutoModelForSequenceClassification,
-        AutoTokenizer,
-        Trainer,
-        TrainingArguments,
-        TrainerCallback,
-        set_seed
-    )
 
 # Human-friendly error message surfaced when ML dependencies are missing. This keeps
 # the Temporal worker process healthy even if the Python environment is not configured
@@ -56,6 +56,7 @@ HEARTBEAT_INTERVAL_SECONDS: Final[float] = 5.0
 # -------------------------------------------------------------------------------
 # Fine Tuning Activities
 # -------------------------------------------------------------------------------
+
 
 class BertFineTuneActivities:
     """Activity collection for checkpoint-aware BERT fine-tuning."""
@@ -383,13 +384,16 @@ class BertFineTuneActivities:
             self.config.model_name,
             num_labels=int(self.num_labels or 2),
             local_files_only=False,
-            low_cpu_mem_usage=False, 
-            dtype=torch.float32
+            low_cpu_mem_usage=False,
+            dtype=torch.float32,
         )
 
         p = next(model.parameters(), None)
         if p is not None and getattr(p, "is_meta", False):
-            raise ApplicationError("Model loaded as meta; accelerate/device_map path is still being taken.", non_retryable=True)
+            raise ApplicationError(
+                "Model loaded as meta; accelerate/device_map path is still being taken.",
+                non_retryable=True,
+            )
 
         if self.task_type == "regression":
             model.config.problem_type = "regression"
@@ -478,7 +482,6 @@ class BertFineTuneActivities:
         trainer.save_model()
         self.tokenizer.save_pretrained(training_args.output_dir)
         Path(training_args.output_dir, "READY").write_text("ok")
-
 
         # Discover any mid-run checkpoints created by the Trainer.
         checkpoint_dirs = sorted(p for p in output_dir.glob("checkpoint-*") if p.is_dir())
@@ -602,7 +605,7 @@ class BertFineTuneActivities:
                     f"{k}={float(v):.4f}"
                     for k, v in result.eval_metrics.items()
                     if isinstance(v, (int, float))
-        ]
+                ]
             eval_summary = ", ".join(picked) if picked else "N/A"
 
         activity.logger.info(
@@ -613,18 +616,18 @@ class BertFineTuneActivities:
         )
         return result
 
+
 # -------------------------------------------------------------------------------
 # Checkpointing Activities
 # -------------------------------------------------------------------------------
 
-class BertCheckpointingActivities:
 
+class BertCheckpointingActivities:
     @staticmethod
     def _create_dataset_snapshot_sync(request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
-        """Create a dataset snapshot synchronously.This helper is synchronous; 
+        """Create a dataset snapshot synchronously.This helper is synchronous;
         the async activity delegates to it via ``asyncio.to_thread`` for non-blocking execution.
         """
-
         # Load the dataset
         raw_datasets = load_dataset(
             request.dataset_name,
@@ -706,6 +709,7 @@ class BertCheckpointingActivities:
             snapshot_timestamp=datetime.utcnow().isoformat(),
             snapshot_path=str(snapshot_path),
         )
+
     @staticmethod
     @activity.defn
     async def create_dataset_snapshot(request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
@@ -717,15 +721,21 @@ class BertCheckpointingActivities:
         )
 
         # Offload to thread to avoid blocking worker
-        snapshot = await asyncio.to_thread(BertCheckpointingActivities._create_dataset_snapshot_sync, request)
+        snapshot = await asyncio.to_thread(
+            BertCheckpointingActivities._create_dataset_snapshot_sync, request
+        )
 
-        activity.logger.info("Dataset snapshot ready: %s (hash: %s)", snapshot.snapshot_id, snapshot.data_hash,)
+        activity.logger.info(
+            "Dataset snapshot ready: %s (hash: %s)", snapshot.snapshot_id, snapshot.data_hash
+        )
 
         return snapshot
+
 
 # -------------------------------------------------------------------------------
 # Evaluation Activities
 # -------------------------------------------------------------------------------
+
 
 class BertEvalActivities:
     """Activity collection for evaluating fine-tuned BERT models on public datasets."""
@@ -764,7 +774,7 @@ class BertEvalActivities:
             raise FileNotFoundError(
                 f"Model directory not found: {model_dir}\nCurrent working directory: {Path.cwd()}\n"
             )
-        
+
         ready = model_dir / "READY"
         if not ready.exists():
             raise ApplicationError(
@@ -774,9 +784,11 @@ class BertEvalActivities:
 
         tokenizer = AutoTokenizer.from_pretrained(str(model_dir), local_files_only=True)
 
-
         model = AutoModelForSequenceClassification.from_pretrained(
-            str(model_dir), local_files_only=True, low_cpu_mem_usage=False, torch_dtype=torch.float32
+            str(model_dir),
+            local_files_only=True,
+            low_cpu_mem_usage=False,
+            torch_dtype=torch.float32,
         )
 
         model.to(device)
@@ -905,6 +917,7 @@ class BertEvalActivities:
             num_examples=total,
             accuracy=accuracy,
         )
+
     @staticmethod
     @activity.defn
     async def evaluate_bert_model(request: BertEvalRequest) -> BertEvalResult:
@@ -920,14 +933,14 @@ class BertEvalActivities:
         result = await asyncio.to_thread(BertEvalActivities._evaluate_bert_model_sync, request)
 
         activity.logger.info(
-            "Completed BERT evaluation for run %s: accuracy=%.3f over %s examples", 
+            "Completed BERT evaluation for run %s: accuracy=%.3f over %s examples",
             result.run_id,
             result.accuracy,
             result.num_examples,
         )
 
         return result
-    
+
 
 # -------------------------------------------------------------------------------
 # Checkpoint Callback Activities
@@ -935,7 +948,7 @@ class BertEvalActivities:
 class QueueingCheckpointCallback(TrainerCallback):
     """Trainer callback that enqueues checkpoint metadata for async signaling."""
 
-    def __init__(self, checkpoint_queue: "queue.Queue[CheckpointInfo]", num_epochs: int,) -> None:
+    def __init__(self, checkpoint_queue: "queue.Queue[CheckpointInfo]", num_epochs: int) -> None:
         self._checkpoint_queue = checkpoint_queue
         self._num_epochs = num_epochs
 

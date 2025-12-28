@@ -13,23 +13,19 @@ This script is intentionally small and tutorial-friendly:
 import asyncio
 import random
 import uuid
+
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+
 from src.workflows.train_tune.bert_sweeps.custom_types import (
     BertEvalRequest,
     BertFineTuneConfig,
     CoordinatorWorkflowConfig,
-    CoordinatorWorkflowInput,
     SweepRequest,
     SweepSpace,
-    TrialResult,
-    SweepResult
-
 )
 from src.workflows.train_tune.bert_sweeps.workflows import (
-    CoordinatorWorkflow,
     LadderSweepWorkflow,
-    SweepWorkflow
 )
 
 # --------------------------------------------------------------------
@@ -38,215 +34,213 @@ from src.workflows.train_tune.bert_sweeps.workflows import (
 
 # Sample 1: {Model: BERT Uncased - Dataset: Glue}
 config_1 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="bert-base-uncased",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=2,
-            batch_size=8,
-            learning_rate=2e-5,
-            max_seq_length=128,
-            use_gpu=True,
-            max_train_samples=3_000,
-            max_eval_samples=2_000,
-            seed=random.randint(0, 10000),
-        ),
-        evaluation_config=BertEvalRequest(
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=128,
-            batch_size=32,
-            use_gpu=True,
-        ),
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="bert-base-uncased",
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        num_epochs=2,
+        batch_size=8,
+        learning_rate=2e-5,
+        max_seq_length=128,
+        use_gpu=True,
+        max_train_samples=3_000,
+        max_eval_samples=2_000,
+        seed=random.randint(0, 10000),
+    ),
+    evaluation_config=BertEvalRequest(
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        split="validation",
+        max_eval_samples=1_000,
+        max_seq_length=128,
+        batch_size=32,
+        use_gpu=True,
+    ),
+)
 
 # Sample 2 {Model: BERT Cased - Dataset: Glue}
 config_2 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="bert-base-cased",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=10,
-            batch_size=16,
-            learning_rate=3e-5,
-            max_seq_length=128,
-            use_gpu=True,
-            max_train_samples=3_000,
-            max_eval_samples=2_000,
-            seed=random.randint(0, 10000),
-        ),
-        evaluation_config=BertEvalRequest(
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=128,
-            batch_size=32,
-            use_gpu=True,
-        ),
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="bert-base-cased",
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        num_epochs=10,
+        batch_size=16,
+        learning_rate=3e-5,
+        max_seq_length=128,
+        use_gpu=True,
+        max_train_samples=3_000,
+        max_eval_samples=2_000,
+        seed=random.randint(0, 10000),
+    ),
+    evaluation_config=BertEvalRequest(
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        split="validation",
+        max_eval_samples=1_000,
+        max_seq_length=128,
+        batch_size=32,
+        use_gpu=True,
+    ),
+)
 
-# Sample 3 {Model: BERT Uncased - Dataset: IMDB} 
+# Sample 3 {Model: BERT Uncased - Dataset: IMDB}
 config_3 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="bert-base-uncased",
-            dataset_name="imdb",
-            dataset_config_name="plain_text",
-            num_epochs=10,
-            batch_size=32,
-            learning_rate=2e-5,
-            max_seq_length=256,
-            use_gpu=True,
-            max_train_samples=5_000,
-            max_eval_samples=2_000,
-            seed=random.randint(0, 10000),
-        ),
-        evaluation_config=BertEvalRequest(
-            dataset_name="imdb",
-            dataset_config_name="plain_text",
-            split="test",
-            max_eval_samples=1_000,
-            max_seq_length=256,
-            batch_size=32,
-            use_gpu=True,
-        ),
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="bert-base-uncased",
+        dataset_name="imdb",
+        dataset_config_name="plain_text",
+        num_epochs=10,
+        batch_size=32,
+        learning_rate=2e-5,
+        max_seq_length=256,
+        use_gpu=True,
+        max_train_samples=5_000,
+        max_eval_samples=2_000,
+        seed=random.randint(0, 10000),
+    ),
+    evaluation_config=BertEvalRequest(
+        dataset_name="imdb",
+        dataset_config_name="plain_text",
+        split="test",
+        max_eval_samples=1_000,
+        max_seq_length=256,
+        batch_size=32,
+        use_gpu=True,
+    ),
+)
 # Sample 4: {Model: DistilBERT - Dataset: Glue}
 config_4 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="distilbert-base-uncased",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=2,
-            batch_size=4,  # MPS-safe
-            learning_rate=5e-5,
-            max_seq_length=64,  # MPS-safe
-            use_gpu=True,
-            max_train_samples=2_000,
-            max_eval_samples=1_000,
-            shuffle_before_select=True,
-            seed=42,
-            # optional overrides if you added them:
-            # text_field=None,
-            # text_pair_field=None,
-            # label_field=None,
-            # task_type="auto",
-        ),
-        evaluation_config=BertEvalRequest(
-            # run_id will be filled in by the coordinator after training
-            run_id=None,
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=64,
-            batch_size=32,
-            use_gpu=True,
-            # if you changed eval to require model_uri/model_path, leave it unset here
-            # and let the coordinator populate it from the training result.
-            # model_path=None,
-            # model_uri=None,
-        ),
-        dataset_snapshot=None,  # or pass a DatasetSnapshotResult if you want reproducibility
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="distilbert-base-uncased",
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        num_epochs=2,
+        batch_size=4,  # MPS-safe
+        learning_rate=5e-5,
+        max_seq_length=64,  # MPS-safe
+        use_gpu=True,
+        max_train_samples=2_000,
+        max_eval_samples=1_000,
+        shuffle_before_select=True,
+        seed=42,
+        # optional overrides if you added them:
+        # text_field=None,
+        # text_pair_field=None,
+        # label_field=None,
+        # task_type="auto",
+    ),
+    evaluation_config=BertEvalRequest(
+        # run_id will be filled in by the coordinator after training
+        run_id=None,
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        split="validation",
+        max_eval_samples=1_000,
+        max_seq_length=64,
+        batch_size=32,
+        use_gpu=True,
+        # if you changed eval to require model_uri/model_path, leave it unset here
+        # and let the coordinator populate it from the training result.
+        # model_path=None,
+        # model_uri=None,
+    ),
+    dataset_snapshot=None,  # or pass a DatasetSnapshotResult if you want reproducibility
+)
 
 # Sample 5: {Model: MiniLM-L12-H384-uncased - Dataset: Glue}
 config_5 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="microsoft/MiniLM-L12-H384-uncased",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=2,
-            batch_size=4,  # still MPS-safe
-            learning_rate=3e-5,  # MiniLM often prefers slightly lower LR
-            max_seq_length=64,  # safe starting point
-            use_gpu=True,
-            max_train_samples=2_000,
-            max_eval_samples=1_000,
-            shuffle_before_select=True,
-            seed=42,
-            # Optional schema overrides (usually not needed for GLUE)
-            # text_field=None,
-            # text_pair_field=None,
-            # label_field=None,
-            # task_type="auto",
-        ),
-        evaluation_config=BertEvalRequest(
-            # run_id filled in by coordinator
-            run_id=None,
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=64,
-            batch_size=32,
-            use_gpu=True,
-            # If your eval requires an explicit model path/URI,
-            # leave it unset here and let the coordinator fill it.
-            # model_path=None,
-            # model_uri=None,
-        ),
-        dataset_snapshot=None,  # pass a snapshot if you want strict reproducibility
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="microsoft/MiniLM-L12-H384-uncased",
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        num_epochs=2,
+        batch_size=4,  # still MPS-safe
+        learning_rate=3e-5,  # MiniLM often prefers slightly lower LR
+        max_seq_length=64,  # safe starting point
+        use_gpu=True,
+        max_train_samples=2_000,
+        max_eval_samples=1_000,
+        shuffle_before_select=True,
+        seed=42,
+        # Optional schema overrides (usually not needed for GLUE)
+        # text_field=None,
+        # text_pair_field=None,
+        # label_field=None,
+        # task_type="auto",
+    ),
+    evaluation_config=BertEvalRequest(
+        # run_id filled in by coordinator
+        run_id=None,
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        split="validation",
+        max_eval_samples=1_000,
+        max_seq_length=64,
+        batch_size=32,
+        use_gpu=True,
+        # If your eval requires an explicit model path/URI,
+        # leave it unset here and let the coordinator fill it.
+        # model_path=None,
+        # model_uri=None,
+    ),
+    dataset_snapshot=None,  # pass a snapshot if you want strict reproducibility
+)
 # Sample 6: {Model: DeBERTa-v3-small - Dataset: Glue}
 config_6 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="microsoft/deberta-v3-small",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=2,
-            batch_size=2,  # DeBERTa tends to be heavier on memory (safer on MPS)
-            learning_rate=2e-5,  # common stable starting LR for DeBERTa fine-tuning
-            max_seq_length=64,  # start safe; bump to 96/128 once stable
-            use_gpu=True,
-            max_train_samples=2_000,
-            max_eval_samples=1_000,
-            shuffle_before_select=True,
-            seed=42,
-            # Optional schema overrides (usually not needed for GLUE)
-            # text_field=None,
-            # text_pair_field=None,
-            # label_field=None,
-            # task_type="auto",
-        ),
-        evaluation_config=BertEvalRequest(
-            run_id=None,  # coordinator fills this in
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=64,
-            batch_size=32,
-            use_gpu=True,
-            # model_path/model_uri left for coordinator to populate from training result
-        ),
-        dataset_snapshot=None,
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="microsoft/deberta-v3-small",
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        num_epochs=2,
+        batch_size=2,  # DeBERTa tends to be heavier on memory (safer on MPS)
+        learning_rate=2e-5,  # common stable starting LR for DeBERTa fine-tuning
+        max_seq_length=64,  # start safe; bump to 96/128 once stable
+        use_gpu=True,
+        max_train_samples=2_000,
+        max_eval_samples=1_000,
+        shuffle_before_select=True,
+        seed=42,
+        # Optional schema overrides (usually not needed for GLUE)
+        # text_field=None,
+        # text_pair_field=None,
+        # label_field=None,
+        # task_type="auto",
+    ),
+    evaluation_config=BertEvalRequest(
+        run_id=None,  # coordinator fills this in
+        dataset_name="glue",
+        dataset_config_name="sst2",
+        split="validation",
+        max_eval_samples=1_000,
+        max_seq_length=64,
+        batch_size=32,
+        use_gpu=True,
+        # model_path/model_uri left for coordinator to populate from training result
+    ),
+    dataset_snapshot=None,
+)
 # Sample 7: {Model: SciBERT - Dataset: SciCite}
 config_7 = CoordinatorWorkflowConfig(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="allenai/scibert_scivocab_uncased",
-            dataset_name="scicite",  # start with SST-2 to validate pipeline
-            dataset_config_name="default",
-            use_gpu=True,
-            max_train_samples=2_000,
-            max_eval_samples=1_000,
-            shuffle_before_select=True
-        ),
-
-        evaluation_config=BertEvalRequest(
-            run_id=None,  # coordinator fills this in
-            dataset_name="scicite",
-            dataset_config_name="default",
-            split="validation",
-            max_eval_samples=1_000,
-            use_gpu=True,
-        ),
-
-        dataset_snapshot=None,  # add snapshot later for reproducibility
-    )
+    fine_tune_config=BertFineTuneConfig(
+        model_name="allenai/scibert_scivocab_uncased",
+        dataset_name="scicite",  # start with SST-2 to validate pipeline
+        dataset_config_name="default",
+        use_gpu=True,
+        max_train_samples=2_000,
+        max_eval_samples=1_000,
+        shuffle_before_select=True,
+    ),
+    evaluation_config=BertEvalRequest(
+        run_id=None,  # coordinator fills this in
+        dataset_name="scicite",
+        dataset_config_name="default",
+        split="validation",
+        max_eval_samples=1_000,
+        use_gpu=True,
+    ),
+    dataset_snapshot=None,  # add snapshot later for reproducibility
+)
 
 # ---------------------------------------------------------------------------
 # Ladder Sample Configurations
@@ -256,7 +250,7 @@ config_7 = CoordinatorWorkflowConfig(
 # can be grouped together in logs and under ``./bert_runs``.
 ladder_id = uuid.uuid4()  # Replace with custom naming logic as desired.
 
-# Sample 1: SciBERT Scaling Ladder 
+# Sample 1: SciBERT Scaling Ladder
 ladder_config_1 = SweepRequest(
     experiment_id=f"Bert-ladder-sweep-{ladder_id}",
     base=config_7,
@@ -268,7 +262,7 @@ ladder_config_1 = SweepRequest(
     ),
     num_trials=8,
     max_concurrency=4,
-    seed=random.randint(0, 10000)
+    seed=random.randint(0, 10000),
 )
 
 
@@ -276,8 +270,8 @@ ladder_config_1 = SweepRequest(
 # Starter Main Function
 # ------------------------------------------------------------------------------
 
-async def main() -> None:
 
+async def main() -> None:
     # 1. Connect to Temporal Server using the Pydantic data converter so our
     # request/response models can be passed directly as workflow arguments.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
@@ -315,6 +309,6 @@ async def main() -> None:
         )
 
 
-#CLI Hook 
+# CLI Hook
 if __name__ == "__main__":
     asyncio.run(main())

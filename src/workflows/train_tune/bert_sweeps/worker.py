@@ -8,6 +8,7 @@ evaluation activities. The heavier training workloads live in
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
@@ -19,16 +20,16 @@ from src.workflows.train_tune.bert_sweeps.workflows import (
     BertEvalWorkflow,
     CheckpointedBertTrainingWorkflow,
     CoordinatorWorkflow,
+    LadderSweepWorkflow,
     SweepWorkflow,
-    LadderSweepWorkflow
 )
 
 # ------------------------------------------------------------------
 # Main Function
 # ------------------------------------------------------------------
 
-async def main() -> None:
 
+async def main() -> None:
     # 1. Connect to Temporal Server using the same Pydantic data converter
     # used by the starter script so typed models round-trip cleanly.
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
@@ -45,14 +46,21 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=task_queue,
-        workflows=[BertEvalWorkflow, CoordinatorWorkflow, CheckpointedBertTrainingWorkflow, SweepWorkflow, LadderSweepWorkflow],
-        activities=[eval_activities.evaluate_bert_model], 
+        workflows=[
+            BertEvalWorkflow,
+            CoordinatorWorkflow,
+            CheckpointedBertTrainingWorkflow,
+            SweepWorkflow,
+            LadderSweepWorkflow,
+        ],
+        activities=[eval_activities.evaluate_bert_model],
         activity_executor=ThreadPoolExecutor(5),
-        max_concurrent_activities=1, # Keep max concurrent activities at 1 for local execution to prevent OOM issues
+        max_concurrent_activities=1,  # Keep max concurrent activities at 1 for local execution to prevent OOM issues
     )
 
-    # 5. Run worker 
+    # 5. Run worker
     await worker.run()
+
 
 # CLI Hook
 if __name__ == "__main__":
