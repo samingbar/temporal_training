@@ -268,7 +268,7 @@ ladder_config_1 = SweepRequest(
         num_epochs=[2, 8],
         max_seq_length=[64, 256],
     ),
-    num_trials=8,
+    num_trials=50,
     max_concurrency=4,
     seed=random.randint(0, 10000),
 )

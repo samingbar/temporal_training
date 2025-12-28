@@ -6,13 +6,15 @@ import hashlib
 import json
 import os
 import queue
+import random
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Final
-import random
+
 import numpy as np
 import torch
+
 try:
     from datasets import ClassLabel
 except Exception:
@@ -55,8 +57,6 @@ HEARTBEAT_INTERVAL_SECONDS: Final[float] = 5.0
 # -------------------------------------------------------------------------------
 # Fine Tuning Activities
 # -------------------------------------------------------------------------------
-
-
 class BertFineTuneActivities:
     """Activity collection for checkpoint-aware BERT fine-tuning."""
 
@@ -980,9 +980,12 @@ class QueueingCheckpointCallback(TrainerCallback):
             activity.logger.exception("Failed to enqueue checkpoint %s", ckpt_dir)
 
         return control
+
+
 # -------------------------------------------------------------------------------
 # Ladder Activities
 # -------------------------------------------------------------------------------
+
 
 @activity.defn
 async def set_seed(seed: int) -> int:
@@ -990,5 +993,4 @@ async def set_seed(seed: int) -> int:
     if seed <= 0:
         seed = random.randint(0, 20000)
         return seed
-    else:
-        return seed
+    return seed
