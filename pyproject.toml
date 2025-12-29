@@ -55,7 +55,9 @@ line-length = 100
 indent-width = 4
 
 [tool.ruff.lint]
-select = ["ALL"]
+# Keep linting lightweight for this science demo:
+# focus on real errors/import issues instead of full style.
+select = ["E", "F", "I"]
 ignore = [
     "INP001", # require __init__,py
     "D401", # first line should be in imperative mood

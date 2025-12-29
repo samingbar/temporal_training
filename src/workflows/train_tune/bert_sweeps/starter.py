@@ -268,7 +268,7 @@ ladder_config_1 = SweepRequest(
         num_epochs=[2, 8],
         max_seq_length=[64, 256],
     ),
-    num_trials=50,
+    num_trials=25,  # increase this for actual research, but ensure the machine has enough compute and memory or move to an autoscaling cluster
     max_concurrency=4,
     seed=random.randint(0, 10000),
 )
