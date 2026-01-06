@@ -228,4 +228,3 @@ In a real deployment:
 - Temporal Server runs in Temporal Cloud or self‑hosted.
 - Training workers run on GPU nodes, eval/coordinator workers on CPU nodes.
 - Experiment metadata (`BertFineTuneResult`, `BertEvalResult`, snapshot info) can be stored in a DB or experiment tracking system.
-

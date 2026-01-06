@@ -96,4 +96,3 @@ To compare this checkpoint‑aware Temporal pattern against alternative orchestr
 - `src/workflows/train_tune/bert_checkpointing/docs/competitive-comparison.md`
 
 It evaluates this design against AWS Step Functions, Azure Durable Functions, Airflow, Dagster/Prefect, and others with respect to durability, long‑running workflows, replayability, portability, and operational ergonomics.
-

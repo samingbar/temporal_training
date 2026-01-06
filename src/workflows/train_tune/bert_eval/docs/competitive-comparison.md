@@ -186,4 +186,3 @@ If your use case is mostly:
 - Pure serverless glue between cloud services in one provider → Step Functions / Durable Functions can be adequate.
 
 But for **long‑running, experiment‑heavy, checkpointed ML workloads**, Temporal’s workflow model, as used in this repo, gives you stronger durability, clearer state modeling, and better replay/debug tooling.
-

@@ -108,7 +108,7 @@ Because all model and dataset I/O is in activities, workflows remain determinist
 - `starter.py` – CLI entrypoint that kicks off the coordinator workflow with a sample GLUE SST-2 configuration and prints metrics.
 - `tests/` – Tests for activities and workflows (to be aligned fully with the `bert_eval` types as the package evolves).
 
-For broader project documentation, Temporal patterns, and troubleshooting, see the root `README.md` and `docs/` directory.  
+For broader project documentation, Temporal patterns, and troubleshooting, see the root `README.md` and `docs/` directory.
 For details on how the underlying checkpointed training pattern is constructed, see `src/workflows/train_tune/bert_checkpointing/README.md` and `CREATE_BERT_CHECKPOINTING.md`.
 
 ## Architecture
@@ -138,4 +138,3 @@ For a step‑by‑step walkthrough of how to construct the `bert_eval` package s
 - `src/workflows/train_tune/bert_eval/docs/CREATE_BERT_EVAL_FROM_CHECKPOINTING.md`
 
 This guide is the evaluation‑layer counterpart to the `CREATE_BERT_CHECKPOINTING` tutorial and is useful if you want to recreate or adapt the pattern in another project.
-

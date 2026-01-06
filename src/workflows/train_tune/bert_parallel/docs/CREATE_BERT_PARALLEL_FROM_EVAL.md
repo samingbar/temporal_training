@@ -30,7 +30,7 @@ You can reuse the same prerequisites as `bert_eval`:
   uv sync --dev
   ```
 
-**Why this step**  
+**Why this step**
 You already have the dependencies and Temporal setup from `bert_eval`. `bert_parallel` adds orchestration logic on top; no new libraries are required.
 
 ---
@@ -45,7 +45,7 @@ mkdir -p src/workflows/train_tune/bert_parallel/docs
 touch src/workflows/train_tune/bert_parallel/{__init__.py,custom_types.py,bert_activities.py,workflows.py,worker.py,training_worker.py,starter.py}
 ```
 
-**Why this step**  
+**Why this step**
 You mirror the structure of `bert_eval`, but keep `bert_parallel` as its own, focused package so that parallel experiment patterns can evolve independently.
 
 ---
@@ -71,7 +71,7 @@ Use `bert_eval.custom_types` as your starting template.
    - Schema overrides: `text_field`, `text_pair_field`, `label_field`, `task_type`.
    - Repro knobs: `seed`, `shuffle_before_select`.
 
-**Why this step**  
+**Why this step**
 `bert_parallel` reuses the same “contract” as `bert_eval`, but it is explicitly designed to manage *lists* of configurations. Keeping types aligned ensures:
 
 - Activities and workflows can move between `bert_eval` and `bert_parallel` easily.
@@ -120,7 +120,7 @@ Then refine where necessary.
      - Infer text fields, tokenize, and compute accuracy.
    - Keep `evaluate_bert_model` as the async wrapper.
 
-**Why this step**  
+**Why this step**
 The core of `bert_parallel` is not new activity behavior but **how those activities are orchestrated in parallel**. Reusing `bert_eval`’s activities keeps logic consistent and lets you focus on multi‑config workflow design.
 
 ---
@@ -163,7 +163,7 @@ Use `bert_eval.workflows` as the base and adapt it to reflect the parallel exper
        - Then loops again, starting a child `BertEvalWorkflow.run` per config on `bert-eval-task-queue`.
        - Collects and returns a `list[BertEvalResult]`.
 
-**Why this step**  
+**Why this step**
 The main enhancement from `bert_eval` to `bert_parallel` is *volume and coordination*:
 
 - `bert_eval` makes it easy to run a single coordinated training + eval pair.
@@ -198,7 +198,7 @@ The main enhancement from `bert_eval` to `bert_parallel` is *volume and coordina
      - Activities:
        - `BertEvalActivities.evaluate_bert_model`.
 
-**Why this step**  
+**Why this step**
 Splitting workers by queue lets you:
 
 - Run training on GPU‑backed workers.
@@ -230,7 +230,7 @@ Use `bert_eval/starter.py` as the template and extend it for multiple configs:
 
 5. Print a concise summary per `BertEvalResult` (run ID, dataset, split, num examples, accuracy).
 
-**Why this step**  
+**Why this step**
 The starter script becomes your “parallel experiment harness”—a single CLI command that demonstrates how multiple experiment configs are driven through the same checkpointed training + eval stack.
 
 ---
@@ -259,7 +259,7 @@ Build on the test patterns from `bert_eval`:
        - It returns a list of results matching the number of configs.
        - Run IDs and model paths are normalized correctly.
 
-**Why this step**  
+**Why this step**
 The tests ensure your parallel orchestration logic remains correct as you tweak activity behavior or extend configuration space. They also catch accidental regressions if you refactor workflows or types.
 
 ---
@@ -277,4 +277,3 @@ To create `bert_parallel` from `bert_eval`, you:
 5. Add a starter script and tests that showcase and validate parallel experiment behavior.
 
 This pattern generalizes to other model families and datasets whenever you need **parallel, checkpoint‑aware ML experimentation** with Temporal.
-

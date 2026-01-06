@@ -28,7 +28,7 @@ The goal of `bert_eval` is to **add a coordinated training + evaluation layer** 
 
 2. Optionally create a `docs` subfolder for `README.md`, `architecture.md`, and `competitive-comparison.md` (this repository already has them; here we focus on the code).
 
-**Why this step**  
+**Why this step**
 You want `bert_eval` to be its own self‑contained package, parallel to `bert_checkpointing`, but reusing design patterns and, where appropriate, logic.
 
 ---
@@ -71,7 +71,7 @@ Start by copying the checkpointing types, then adding evaluation‑specific mode
    - `CoordinatorWorkflowInput`:
      - `configs: list[CoordinatorWorkflowConfig]`.
 
-**Why this step**  
+**Why this step**
 Keeping all types (training, inference, evaluation, coordination) in a single `custom_types.py` mirrors the `bert_checkpointing` pattern and simplifies Pydantic data‑converter usage.
 
 ---
@@ -117,7 +117,7 @@ The `bert_eval` activities file extends the checkpointing activities with:
      - Log start/end.
      - Offload sync helper via `asyncio.to_thread`.
 
-**Why this step**  
+**Why this step**
 This is where `bert_eval` diverges most from `bert_checkpointing`: you keep the snapshot + checkpoint‑aware training backbone, but you add schema inference and evaluation logic so the coordinator can return usable metrics.
 
 ---
@@ -170,7 +170,7 @@ This is where `bert_eval` diverges most from `bert_checkpointing`: you keep the 
        - Start a child `BertEvalWorkflow.run` per config on `bert-eval-task-queue`, passing a `BertEvalRequest` built from `cfg.evaluation_config`.
        - Collect and return the list of `BertEvalResult` objects.
 
-**Why this step**  
+**Why this step**
 This is where you lift `bert_checkpointing` from “one training run per workflow” to “experiment coordinator” that glues together training and evaluation for multiple configs.
 
 ---
@@ -226,7 +226,7 @@ This is where you lift `bert_checkpointing` from “one training run per workflo
 
    - Print a summary from `results[0]` (run ID, dataset, split, num examples, accuracy).
 
-**Why this step**  
+**Why this step**
 Workers and the starter are what transform your reusable orchestration code into a runnable “demo”: one command to start workers, one to run an experiment, easy to share with other engineers.
 
 ---
@@ -249,7 +249,7 @@ Workers and the starter are what transform your reusable orchestration code into
      - Mock snapshot, training, and eval activities.
      - Assert it returns a list of `BertEvalResult` and that `run_id` normalization behaves as expected.
 
-**Why this step**  
+**Why this step**
 Tests ensure you can refactor the internals of `bert_eval` (e.g., change how metrics are stored) without breaking the high‑level behavior that other modules and demos depend on.
 
 ---
@@ -265,4 +265,3 @@ To create `bert_eval` from `bert_checkpointing`, you:
 5. Add a CLI starter and tests to validate the end‑to‑end experiment flow.
 
 This pattern generalizes beyond BERT: the same approach can coordinate any checkpoint‑capable training loop and evaluation pipeline over Temporal.
-

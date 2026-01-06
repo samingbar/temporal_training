@@ -227,4 +227,3 @@ While this repository is demo‑grade, the architecture scales into production:
   - A config repo.
   - An internal experiment UI.
   - An external orchestration layer (e.g., an MLOps platform) that treats Temporal as the durable control‑plane.
-

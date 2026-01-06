@@ -13,7 +13,7 @@ It is intentionally simpler than `bert_checkpointing` and `bert_eval` and serves
 - `BertFineTuningWorkflow`
   - Input: `BertExperimentInput` (experiment name + list of `BertFineTuneConfig` runs).
   - For each config:
-    - Derives a stable `run_id` of the form  
+    - Derives a stable `run_id` of the form
       `"{experiment_name}-run-{index}-{model_name_sanitized}"`.
     - Builds a `BertFineTuneRequest(run_id, config)`.
     - Executes the `fine_tune_bert` activity with a generous timeout.
@@ -185,4 +185,3 @@ For production, you would layer on:
   - Inference workers potentially on cheaper CPU instances.
 
 This folder is the first step in that progression.
-

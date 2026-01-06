@@ -34,11 +34,11 @@ from src.workflows.train_tune.bert_checkpointing.custom_types import (
 import torch
 from datasets import load_dataset
 from transformers import (
-        AutoModelForSequenceClassification,
-        AutoTokenizer,
-        Trainer,
-        TrainingArguments,
-    )
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    Trainer,
+    TrainingArguments,
+)
 
 # Human-friendly error message surfaced when ML dependencies are missing. This keeps
 # the Temporal worker process healthy even if the Python environment is not configured
@@ -52,6 +52,7 @@ TRANSFORMERS_IMPORT_MESSAGE: Final[str] = (
 # running in a background thread. This example uses a modest interval suitable for
 # both local development and the 5s per-test timeout configured in pytest.
 HEARTBEAT_INTERVAL_SECONDS: Final[float] = 5.0
+
 
 # -------------------------------------------------------------------------------
 # Fine Tuning Activities
@@ -267,8 +268,9 @@ class BertFineTuneActivities:
         )
         return result
 
+
 # -------------------------------------------------------------------------------
-# TEMP: Inference Activity 
+# TEMP: Inference Activity
 # -------------------------------------------------------------------------------
 class BertInferenceActivities:
     def __init__(self):
@@ -344,6 +346,7 @@ class BertInferenceActivities:
             request.run_id,
         )
         return result
+
 
 # -------------------------------------------------------------------------------
 # Checkpointing Activities

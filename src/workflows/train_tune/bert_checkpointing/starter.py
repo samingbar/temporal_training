@@ -22,6 +22,7 @@ from src.workflows.train_tune.bert_checkpointing.workflow import (
     CheckpointedBertTrainingWorkflow,
 )
 
+
 async def main() -> None:
     """Execute a sample checkpoint-aware BERT training workflow."""
     # 1. Connect to the Temporal server using the Pydantic data converter so
@@ -100,6 +101,7 @@ async def main() -> None:
         strict=True,
     ):
         print(f"{text!r} -> label={label}, confidence={score:.3f}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

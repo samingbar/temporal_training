@@ -1,7 +1,6 @@
 """
-UPDATE ME PLEASE!! 
+UPDATE ME PLEASE!!
 """
-
 
 from typing import Literal
 

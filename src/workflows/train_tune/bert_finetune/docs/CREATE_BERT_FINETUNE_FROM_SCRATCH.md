@@ -21,7 +21,7 @@ This document is a **step‑by‑step build log** for recreating the `bert_finet
   pip install uv
   ```
 
-**Why this step**  
+**Why this step**
 You need a modern Python runtime, a running Temporal server, and a reproducible environment tool so the rest of the tutorial can focus on workflows and activities, not setup issues.
 
 ---
@@ -49,7 +49,7 @@ Then install:
 uv sync --dev
 ```
 
-**Why this step**  
+**Why this step**
 You carve out a self‑contained `bert_finetune` package with clear slots for types, activities, workflows, worker, CLIs, and tests—mirroring how production Temporal projects are organized.
 
 ---
@@ -110,7 +110,7 @@ Key models:
      - `experiment_name: str`
      - `runs: list[BertFineTuneResult]`
 
-**Why this step**  
+**Why this step**
 Centralizing all types in `custom_types.py` gives you a single source of truth for experiment configuration and results, and lets the Pydantic data converter handle serialization automatically across workflows, activities, and CLIs.
 
 ---
@@ -184,7 +184,7 @@ Activities own all non‑deterministic ML work: dataset access, tokenization, tr
            raise
    ```
 
-**Why this step**  
+**Why this step**
 The sync helper encapsulates all ML logic and is easy to unit‑test. The async wrapper integrates with Temporal’s heartbeat and cancellation semantics while keeping the event loop responsive.
 
 ### 3.2 Inference activity
@@ -207,7 +207,7 @@ The sync helper encapsulates all ML logic and is easy to unit‑test. The async 
        return result
    ```
 
-**Why this step**  
+**Why this step**
 Inference is read‑only but still performs I/O and heavy compute; it belongs in an activity, not in a workflow. Reusing the same pattern as training keeps things symmetric and testable.
 
 ---
@@ -254,7 +254,7 @@ Workflows orchestrate training and inference while remaining deterministic and f
      - Calls `workflow.execute_activity("run_bert_inference", input, start_to_close_timeout=timedelta(minutes=10))`.
      - Returns `BertInferenceResult`.
 
-**Why this step**  
+**Why this step**
 This is the “pure orchestration” layer: it sequences fine‑tune and inference activities but never touches the filesystem or ML libraries directly, preserving determinism.
 
 ---
@@ -282,7 +282,7 @@ Wire workflows and activities together in a worker process.
    await worker.run()
    ```
 
-**Why this step**  
+**Why this step**
 The worker is the runtime engine for your workflows and activities. Keeping all registration in one module makes it easy to scale and to see what’s running where.
 
 ---
@@ -325,7 +325,7 @@ The worker is the runtime engine for your workflows and activities. Keeping all 
 
 4. Print predictions and confidences per text.
 
-**Why this step**  
+**Why this step**
 These scripts are your “happy path” demos—copy‑pasteable commands that exercise the full stack (client → workflow → activities → results) and serve as live documentation.
 
 ---
@@ -347,7 +347,7 @@ These scripts are your “happy path” demos—copy‑pasteable commands that e
    - For inference:
      - Verify that the workflow delegates to the activity and returns a `BertInferenceResult`.
 
-**Why this step**  
+**Why this step**
 Tests ensure you can evolve the internals (e.g., change metric structure, modify sampling behavior) while preserving the external API that other code and demos rely on.
 
 ---
@@ -367,4 +367,3 @@ Once this baseline is solid, you can extend it to:
 
 - `bert_checkpointing` for dataset snapshots and checkpoint‑aware resume.
 - `bert_eval` for coordinated training + evaluation experiments.
-

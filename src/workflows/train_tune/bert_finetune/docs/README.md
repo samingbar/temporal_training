@@ -121,4 +121,3 @@ For a brief comparison of this baseline Temporal pattern against other orchestra
 For a step‑by‑step walkthrough of how to construct the `bert_finetune` package from scratch (types → activities → workflows → worker → CLIs → tests), see:
 
 - `src/workflows/train_tune/bert_finetune/docs/CREATE_BERT_FINETUNE_FROM_SCRATCH.md`
-

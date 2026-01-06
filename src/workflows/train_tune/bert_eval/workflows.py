@@ -251,9 +251,7 @@ class CoordinatorWorkflow:
     @workflow.run
     async def run(self, input: CoordinatorWorkflowInput) -> list[BertEvalResult]:
         """Execute the coordinator workflow and return per-config evaluation results."""
-        workflow.logger.info(
-            "Coordinator workflow started with %s config(s)", len(input.configs)
-        )
+        workflow.logger.info("Coordinator workflow started with %s config(s)", len(input.configs))
 
         eval_results: list[BertEvalResult] = []
 

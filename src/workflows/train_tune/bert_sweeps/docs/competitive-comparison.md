@@ -246,4 +246,3 @@ Other systems can run hyperparameter sweeps, but Temporal gives you:
 - A first‑class notion of workflows, children, and history.
 - A deterministic execution model that makes adaptive search easier to reason about.
 - A clean separation between orchestration (this repo) and ML libraries (activities).
-

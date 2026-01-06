@@ -176,4 +176,3 @@ To move from this demo toward a production-scale CIFAR-10 (or similar) system:
   - Enrich `Cifar10TrainResult` with dataset and code version information.
 
 With these additions, `cifar10_scaleup` becomes a robust pattern for scaling vision models using Temporal and Ray, consistent with the rest of the `train_tune` portfolio.
-

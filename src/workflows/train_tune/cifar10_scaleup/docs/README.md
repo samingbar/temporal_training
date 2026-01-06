@@ -143,4 +143,3 @@ Compared to ad-hoc scripts or pure Ray drivers, Temporal adds a **durable, repla
   - `cifar10_workflow.py` (integration-style, using mocked activities and Temporal’s test environment).
 
 For BERT-focused examples and the broader `train_tune` portfolio, see `src/workflows/train_tune/PORTFOLIO.md`.
-

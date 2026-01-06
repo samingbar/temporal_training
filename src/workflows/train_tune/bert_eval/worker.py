@@ -42,6 +42,7 @@ async def main() -> None:
     # 5. Run worker
     await worker.run()
 
-#CLI Hook
+
+# CLI Hook
 if __name__ == "__main__":
     asyncio.run(main())

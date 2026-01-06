@@ -1,5 +1,5 @@
 """
-FILL ME OUT PLEASE!! 
+FILL ME OUT PLEASE!!
 """
 
 import asyncio
@@ -542,7 +542,7 @@ class BertFineTuneActivities:
                 info.workflow_id,
                 run_id=info.workflow_run_id,
             )
-        except Exception:  
+        except Exception:
             activity.logger.exception(
                 "Failed to initialize checkpoint signaling; continuing without it",
             )
@@ -563,7 +563,7 @@ class BertFineTuneActivities:
                             break
                         try:
                             await signal_handle.signal("update_checkpoint", checkpoint_info)
-                        except Exception:  
+                        except Exception:
                             activity.logger.exception(
                                 "Failed to signal checkpoint %s",
                                 checkpoint_info.path,
@@ -584,7 +584,7 @@ class BertFineTuneActivities:
                     checkpoint_info = checkpoint_queue.get_nowait()
                     try:
                         await signal_handle.signal("update_checkpoint", checkpoint_info)
-                    except Exception: 
+                    except Exception:
                         activity.logger.exception(
                             "Failed to signal checkpoint %s",
                             checkpoint_info.path,
@@ -617,6 +617,7 @@ class BertFineTuneActivities:
             eval_summary,
         )
         return result
+
 
 # -------------------------------------------------------------------------------
 # Checkpointing Activities

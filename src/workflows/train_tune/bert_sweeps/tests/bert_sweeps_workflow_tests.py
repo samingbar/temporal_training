@@ -176,4 +176,3 @@ class TestBertSweepsWorkflows:
                 assert item.split == "validation"
                 assert item.num_examples > 0
                 assert 0.0 <= item.accuracy <= 1.0
-

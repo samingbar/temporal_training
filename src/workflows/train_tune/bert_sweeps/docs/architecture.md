@@ -245,4 +245,3 @@ As a result, you can:
     - Training workers with GPU access.
     - Eval/sweep workers on CPU or mixed pools.
   - Store results, metrics, and lineage (dataset hash, config hash, code version) in a durable database or experiment tracker.
-

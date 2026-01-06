@@ -125,4 +125,3 @@ To understand how this parallel checkpointed pattern compares to AWS Step Functi
 For a step‑by‑step walkthrough of how to construct the `bert_parallel` package starting from `bert_eval` (types → activities → workflows → workers → tests), see:
 
 - `src/workflows/train_tune/bert_parallel/docs/CREATE_BERT_PARALLEL_FROM_EVAL.md`
-

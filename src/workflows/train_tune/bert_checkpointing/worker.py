@@ -21,6 +21,7 @@ from src.workflows.train_tune.bert_checkpointing.workflow import (
 # Main Function
 # ------------------------------------------------------------------
 
+
 async def main() -> None:
     # 1. Connect to Temporal Server using the same Pydantic data converter
     # used by the starter script so typed models round-trip cleanly.
@@ -35,7 +36,7 @@ async def main() -> None:
     inference_activities = BertInferenceActivities()
     checkpointing_activities = BertCheckpointingActivities()
 
-     # 4. Build worker
+    # 4. Build worker
     worker = Worker(
         client,
         task_queue=task_queue,
@@ -47,9 +48,10 @@ async def main() -> None:
         ],
         activity_executor=ThreadPoolExecutor(5),
     )
-    
+
     # 5. Run worker
     await worker.run()
+
 
 # CLI Hook
 if __name__ == "__main__":

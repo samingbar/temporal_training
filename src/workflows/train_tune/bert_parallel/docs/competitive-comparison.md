@@ -116,4 +116,3 @@ If your needs are:
 - Pure serverless glue on a single cloud → Step Functions or Durable Functions can work.
 
 But for **parallel, checkpoint‑aware, experiment‑heavy BERT training and evaluation**, Temporal’s workflow model—as used in this `bert_parallel` package—provides stronger durability, better replay semantics, and more natural scaling and introspection.
-

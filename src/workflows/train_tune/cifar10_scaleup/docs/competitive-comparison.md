@@ -216,4 +216,3 @@ Other systems can orchestrate training jobs, but Temporal gives you:
 - A reliable, replayable record of which configurations were run.
 - Clear separation between orchestration logic and distributed training infrastructure (Ray).
 - A consistent developer experience across both BERT and CIFAR-10 examples in this portfolio.
-

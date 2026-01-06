@@ -540,7 +540,7 @@ class BertFineTuneActivities:
                 info.workflow_id,
                 run_id=info.workflow_run_id,
             )
-        except Exception:  
+        except Exception:
             activity.logger.exception(
                 "Failed to initialize checkpoint signaling; continuing without it",
             )
@@ -561,7 +561,7 @@ class BertFineTuneActivities:
                             break
                         try:
                             await signal_handle.signal("update_checkpoint", checkpoint_info)
-                        except Exception:  
+                        except Exception:
                             activity.logger.exception(
                                 "Failed to signal checkpoint %s",
                                 checkpoint_info.path,
@@ -582,7 +582,7 @@ class BertFineTuneActivities:
                     checkpoint_info = checkpoint_queue.get_nowait()
                     try:
                         await signal_handle.signal("update_checkpoint", checkpoint_info)
-                    except Exception: 
+                    except Exception:
                         activity.logger.exception(
                             "Failed to signal checkpoint %s",
                             checkpoint_info.path,
@@ -976,7 +976,7 @@ class QueueingCheckpointCallback(TrainerCallback):
         # Enqueue the checkpoint info for the async activity wrapper to consume.
         try:
             self._checkpoint_queue.put_nowait(checkpoint_info)
-        except Exception: 
+        except Exception:
             # Never fail training because of queue issues.
             activity.logger.exception("Failed to enqueue checkpoint %s", ckpt_dir)
 

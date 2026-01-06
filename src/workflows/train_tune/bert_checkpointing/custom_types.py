@@ -15,6 +15,7 @@ truth for field names and validation rules.
 from typing import Literal
 from pydantic import BaseModel, Field
 
+
 # ----------------------------------------------------------------------------------------------
 # Checkpointing - Related types
 # ----------------------------------------------------------------------------------------------
@@ -34,6 +35,8 @@ class DatasetSnapshotRequest(BaseModel):
     snapshot_dir: str = Field(
         default="./data_snapshots", description="Directory to store snapshots."
     )
+
+
 class DatasetSnapshotResult(BaseModel):
     """Result describing a materialized dataset snapshot.
 
@@ -79,6 +82,7 @@ class CheckpointInfo(BaseModel):
     path: str = Field(description="Filesystem path to checkpoint")
     loss: float = Field(description="Training loss at this checkpoint")
     timestamp: str = Field(description="ISO timestamp when saved")
+
 
 # ---------------------------------------------------------------------------
 # Activity-level types (training and inference)
@@ -173,6 +177,7 @@ class BertFineTuneConfig(BaseModel):
         default=None, description="Logical identifier for this fine-tuning run."
     )
 
+
 class BertFineTuneRequest(BaseModel):
     """Input to a BERT fine-tuning activity run."""
 
@@ -191,6 +196,7 @@ class BertFineTuneRequest(BaseModel):
     resume_from_checkpoint: str | None = Field(
         default=None, description="Path to checkpoint to resume from (if retrying)"
     )
+
 
 class BertFineTuneResult(BaseModel):
     """Summary metrics from a BERT fine-tuning run."""
@@ -226,6 +232,7 @@ class BertFineTuneResult(BaseModel):
         description="Total number of checkpoints saved during training.",
     )
 
+
 class BertInferenceRequest(BaseModel):
     """Input to a BERT inference activity run."""
 
@@ -247,6 +254,7 @@ class BertInferenceRequest(BaseModel):
         description="Whether to use GPU/MPS for inference if available.",
     )
 
+
 class BertInferenceResult(BaseModel):
     """Inference results for a batch of texts using a fine-tuned BERT model."""
 
@@ -263,6 +271,7 @@ class BertInferenceResult(BaseModel):
     confidences: list[float] = Field(
         description="Confidence scores (max softmax probability) per prediction.",
     )
+
 
 # ---------------------------------------------------------------------------
 # Workflow-level types
