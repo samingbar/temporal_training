@@ -1,18 +1,9 @@
-"""Shared data models for the BERT fine-tuning and inference example.
-
-These Pydantic models are used in three places:
-
-- As workflow inputs/outputs (e.g., ``BertExperimentInput``)
-- As activity inputs/outputs (e.g., ``BertFineTuneRequest``)
-- From external clients (see ``train.py`` and ``inference.py``) that submit
-  workflows to Temporal.
-
-Keeping the types in a dedicated module makes it easy to reuse them across
-workflows, activities, and client code while preserving a single source of
-truth for field names and validation rules.
+"""
+UPDATE ME PLEASE!! 
 """
 
-from typing import Final  # noqa: F401  - kept for parity with other modules.
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -73,6 +64,10 @@ class DatasetSnapshotResult(BaseModel):
     snapshot_path: str = Field(
         description="Filesystem path where the snapshot artifacts are stored.",
     )
+    dataset_schema: dict[str, str] | None = Field(
+        default=None,
+        description="Optional schema hints such as text_field/label_field/task_type/num_labels.",
+    )
 
 
 class CheckpointInfo(BaseModel):
@@ -129,9 +124,9 @@ class BertFineTuneConfig(BaseModel):
         description="Learning rate for the optimizer.",
     )
     max_seq_length: int = Field(
+        default=128,
         gt=8,
         le=512,
-        default=128,
         description="Maximum sequence length for tokenization.",
     )
     use_gpu: bool = Field(
@@ -152,6 +147,33 @@ class BertFineTuneConfig(BaseModel):
             "Optional cap on the number of evaluation examples to use. "
             "Set to None to evaluate on the full validation set."
         ),
+    )
+    text_field: str | None = Field(default=None, description="Primary text column name.")
+    text_pair_field: str | None = Field(
+        default=None, description="Optional second text column for pair tasks."
+    )
+    label_field: str | None = Field(
+        default=None, description="Label column name (e.g., 'label', 'labels', 'target')."
+    )
+    task_type: Literal["auto", "classification", "regression"] = Field(
+        default="auto",
+        description="Task type. 'auto' infers from dataset features.",
+    )
+    shuffle_before_select: bool = Field(
+        default=True,
+        description=(
+            "Whether to shuffle the dataset before applying max_train_samples "
+            "or max_eval_samples. Improves representativeness for small demo runs."
+        ),
+    )
+
+    seed: int = Field(
+        default=42,
+        description="Random seed used for dataset shuffling and train/validation splits.",
+    )
+
+    run_id: str | None = Field(
+        default=None, description="Logical identifier for this fine-tuning run."
     )
 
 
@@ -188,9 +210,9 @@ class BertFineTuneResult(BaseModel):
         description="Final training loss reported by the Trainer.",
     )
 
-    eval_accuracy: float | None = Field(
+    eval_metrics: dict[str, float] | None = Field(
         default=None,
-        description="Validation accuracy if available.",
+        description="Evaluation metrics reported by Trainer.evaluate() (e.g., accuracy, f1, mse).",
     )
 
     training_time_seconds: float = Field(
@@ -208,6 +230,11 @@ class BertFineTuneResult(BaseModel):
     total_checkpoints_saved: int = Field(
         description="Total number of checkpoints saved during training.",
     )
+    inferred_text_field: str | None = Field(default=None)
+    inferred_text_pair_field: str | None = Field(default=None)
+    inferred_label_field: str | None = Field(default=None)
+    inferred_task_type: str | None = Field(default=None)  # "classification" / "regression"
+    inferred_num_labels: int | None = Field(default=None)
 
 
 class BertInferenceRequest(BaseModel):
@@ -302,6 +329,16 @@ class BertEvalRequest(BaseModel):
         description="Whether to use GPU/MPS for evaluation if available.",
     )
 
+    model_path: str | None = Field(
+        default=None,
+        description=(
+            "Path to the fine-tuned model checkpoint. Typically filled in by the "
+            "coordinator workflow; if still unset at activity time, evaluation will fail."
+        ),
+    )
+
+    seed: int = Field(default=42)
+
 
 class BertEvalResult(BaseModel):
     """Aggregate metrics from evaluating a fine-tuned BERT model."""
@@ -358,8 +395,12 @@ class BertExperimentOutput(BaseModel):
     """Per-configuration fine-tuning results."""
 
 
-class CoordinatorWorkflowInput(BaseModel):
+class CoordinatorWorkflowConfig(BaseModel):
     """Input to the Coordinator Workflow."""
+
+    run_id: str | None = Field(
+        default=None, description="Recommended logical identifier for this fine-tuning run."
+    )
 
     fine_tune_config: BertFineTuneConfig = Field(
         description="Configuration for the BERT fine-tuning run."
@@ -369,4 +410,12 @@ class CoordinatorWorkflowInput(BaseModel):
     )
     evaluation_config: BertEvalRequest = Field(
         description="Configuration for evaluating the fine-tuned BERT model."
+    )
+
+
+class CoordinatorWorkflowInput(BaseModel):
+    """Input to the Coordinator Workflow."""
+
+    configs: list[CoordinatorWorkflowConfig] = Field(
+        description="List of configurations for the coordinator workflow to run and manage."
     )

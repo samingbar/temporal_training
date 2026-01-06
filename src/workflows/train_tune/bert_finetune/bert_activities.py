@@ -84,7 +84,16 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     tokenizer = AutoTokenizer.from_pretrained(config.model_name)
 
     # Apply the tokenizer across the dataset; `batched=True` lets HF process
-    # multiple rows at once for better throughput.
+    # multiple rows at once for better throughput. We mirror the checkpointed
+    # example's behavior and assume a ``sentence`` column by default.
+    def tokenize_function(batch: dict) -> dict:
+        return tokenizer(
+            batch["sentence"],
+            padding="max_length",
+            truncation=True,
+            max_length=config.max_seq_length,
+        )
+
     tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
     tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
     # Tell Datasets to yield PyTorch tensors for the columns the Trainer needs.
@@ -124,7 +133,7 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     model.to(device)
 
     # -------------------------------------------------------------------------
-    # 5. Configure the Transformers Trainer.
+        # 5. Configure the Transformers Trainer.
     #
     # The Trainer owns the training loop, evaluation, and logging. The choice
     # of hyperparameters here is intentionally simple and tuned for readability
@@ -133,18 +142,18 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     # Note: Transformers 4.57.1 uses `eval_strategy` instead of the older
     # `evaluation_strategy` argument.
     # -------------------------------------------------------------------------
-    training_args = TrainingArguments(
-        output_dir=f"./bert_runs/{request.run_id}",
-        num_train_epochs=float(config.num_epochs),
-        per_device_train_batch_size=config.batch_size,
-        per_device_eval_batch_size=config.batch_size,
-        learning_rate=config.learning_rate,
-        eval_strategy="epoch",
-        save_strategy="no",
-        logging_strategy="epoch",
-        report_to=[],
-        load_best_model_at_end=False,
-    )
+        training_args = TrainingArguments(
+            output_dir=f"./bert_runs/{request.run_id}",
+            num_train_epochs=float(config.num_epochs),
+            per_device_train_batch_size=config.batch_size,
+            per_device_eval_batch_size=config.batch_size,
+            learning_rate=config.learning_rate,
+            eval_strategy="epoch" if eval_dataset is not None else "no",
+            save_strategy="no",
+            logging_strategy="epoch",
+            report_to=[],
+            load_best_model_at_end=False,
+        )
 
     def compute_metrics(eval_pred):
         logits, labels = eval_pred

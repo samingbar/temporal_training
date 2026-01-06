@@ -27,17 +27,34 @@ with workflow.unsafe.imports_passed_through():
         DatasetSnapshotResult,
     )
 
-
+# ----------------------------------------------------------------------------------
+# Checkpointed BERT Training Workflow
+# ----------------------------------------------------------------------------------
 @workflow.defn
 class CheckpointedBertTrainingWorkflow:
-    """Workflow that runs checkpoint-aware fine-tuning with a shared snapshot."""
+    """Workflow that runs checkpoint-aware fine-tuning with a shared snapshot.
+
+    The pattern here is:
+
+    1. Materialize (or reuse) a dataset snapshot so that training becomes
+       reproducible across workers and retries.
+    2. Run a single long-lived training activity that periodically saves model
+       checkpoints and reports progress through signals.
+    3. Expose lightweight queries so external clients can inspect the most
+       recent checkpoint while the run is still in flight.
+    """
 
     def __init__(self) -> None:
         self.latest_checkpoint: CheckpointInfo | None = None
+        self.run_id = None
 
     @workflow.signal
     def update_checkpoint(self, info: CheckpointInfo) -> None:
-        """Record the most recent checkpoint information in workflow state."""
+        """Record the most recent checkpoint information in workflow state.
+
+        Activities call this signal whenever a new checkpoint is persisted so
+        that the workflow can expose it via :py:meth:`get_latest_checkpoint`.
+        """
         self.latest_checkpoint = info
 
     @workflow.query
@@ -45,12 +62,22 @@ class CheckpointedBertTrainingWorkflow:
         """Expose the most recently recorded checkpoint (if any)."""
         return self.latest_checkpoint
 
+    # Main Workflow Function
     @workflow.run
     async def run(self, config: BertFineTuneConfig) -> BertFineTuneResult:
         """Run a single checkpoint-aware fine-tuning job."""
-        # Derive a human-friendly, unique run identifier for this workflow run.
-        # We base this on Temporal's run_id so each execution gets a fresh name.
-        run_id = f"bert-checkpointed-{workflow.info().run_id}"
+        # Prefer a coordinator-provided run_id when present so that the
+        # coordinator can control how training/eval artifacts are named and the
+        # evaluation workflow can later find the right checkpoint directory.
+        if config.run_id:
+            run_id = config.run_id
+        else:
+            # Fallback for direct usage without a coordinator: derive a
+            # human-friendly, unique run identifier from Temporal's run_id.
+            run_id = f"bert-checkpointed-{workflow.info().run_id}"
+            config.run_id = run_id
+
+        self.run_id = run_id
 
         workflow.logger.info(
             "Starting checkpointed BERT run for model %s on %s/%s",
@@ -66,6 +93,7 @@ class CheckpointedBertTrainingWorkflow:
             dataset_config=config.dataset_config_name,
             max_samples=config.max_train_samples,
         )
+
         snapshot: DatasetSnapshotResult = await workflow.execute_activity(
             "create_dataset_snapshot",
             snapshot_request,
@@ -75,6 +103,7 @@ class CheckpointedBertTrainingWorkflow:
         # Step 2: Run checkpoint-aware fine-tuning, optionally resuming from the
         # latest known checkpoint path (if one has already been recorded).
         resume_from = self.latest_checkpoint.path if self.latest_checkpoint else None
+
         request = BertFineTuneRequest(
             run_id=run_id,
             config=config,
@@ -90,9 +119,11 @@ class CheckpointedBertTrainingWorkflow:
 
         # Guard against cases where the Pydantic data converter returns a plain
         # dict instead of a model instance (e.g., if imports are misaligned).
+
         if isinstance(result, dict):
             run_id = result.get("run_id")
             checkpoints_saved = result.get("total_checkpoints_saved")
+
         else:
             run_id = result.run_id
             checkpoints_saved = result.total_checkpoints_saved
@@ -102,6 +133,7 @@ class CheckpointedBertTrainingWorkflow:
             run_id,
             checkpoints_saved,
         )
+
         # If we got a dict back, re-wrap it as a BertFineTuneResult so callers
         # see a consistent type.
         if isinstance(result, dict):

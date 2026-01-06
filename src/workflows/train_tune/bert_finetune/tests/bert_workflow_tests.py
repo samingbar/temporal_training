@@ -8,7 +8,9 @@ from temporalio import activity
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_finetune.bert_activities import (
+from src.workflows.train_tune.bert_finetune.custom_types import (
+    BertExperimentInput,
+    BertExperimentOutput,
     BertFineTuneConfig,
     BertFineTuneRequest,
     BertFineTuneResult,
@@ -16,8 +18,6 @@ from src.workflows.train_tune.bert_finetune.bert_activities import (
     BertInferenceResult,
 )
 from src.workflows.train_tune.bert_finetune.bert_workflow import (
-    BertExperimentInput,
-    BertExperimentOutput,
     BertFineTuningWorkflow,
     BertInferenceWorkflow,
 )

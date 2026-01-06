@@ -11,12 +11,11 @@ import asyncio
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from src.workflows.train_tune.bert_eval.checkpointed_training import (
-    CoordinatorWorkflow,
-)
+from src.workflows.train_tune.bert_eval.workflows import CoordinatorWorkflow
 from src.workflows.train_tune.bert_eval.custom_types import (
     BertEvalRequest,
     BertFineTuneConfig,
+    CoordinatorWorkflowConfig,
     CoordinatorWorkflowInput,
 )
 
@@ -33,37 +32,42 @@ async def main() -> None:
     #      of examples for a fast, tutorial-friendly run.
 
     request = CoordinatorWorkflowInput(
-        fine_tune_config=BertFineTuneConfig(
-            model_name="bert-base-uncased",
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            num_epochs=2,
-            batch_size=32,
-            learning_rate=2e-5,
-            max_seq_length=128,
-            use_gpu=True,
-            max_train_samples=3_000,
-            max_eval_samples=2_000,
-        ),
-        evaluation_config=BertEvalRequest(
-            dataset_name="glue",
-            dataset_config_name="sst2",
-            split="validation",
-            max_eval_samples=1_000,
-            max_seq_length=128,
-            batch_size=32,
-            use_gpu=True,
-        ),
+        configs=[
+            CoordinatorWorkflowConfig(
+                fine_tune_config=BertFineTuneConfig(
+                    model_name="bert-base-uncased",
+                    dataset_name="glue",
+                    dataset_config_name="sst2",
+                    num_epochs=2,
+                    batch_size=32,
+                    learning_rate=2e-5,
+                    max_seq_length=128,
+                    use_gpu=True,
+                    max_train_samples=3_000,
+                    max_eval_samples=2_000,
+                ),
+                evaluation_config=BertEvalRequest(
+                    dataset_name="glue",
+                    dataset_config_name="sst2",
+                    split="validation",
+                    max_eval_samples=1_000,
+                    max_seq_length=128,
+                    batch_size=32,
+                    use_gpu=True,
+                ),
+            ),
+        ],
     )
     # 3. Start the evaluation workflow and wait for the result.
-    result = await client.execute_workflow(
+    results = await client.execute_workflow(
         CoordinatorWorkflow.run,
         request,
         id="bert-end2end-demo",
         task_queue="bert-eval-task-queue",
     )
 
-    # 4. Print a concise summary of the evaluation.
+    # 4. Print a concise summary of the first evaluation result.
+    result = results[0]
     print("\nBERT evaluation result:")
     print(
         f"- run_id={result.run_id}, "

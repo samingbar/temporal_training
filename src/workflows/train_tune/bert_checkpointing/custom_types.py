@@ -12,14 +12,12 @@ workflows, activities, and client code while preserving a single source of
 truth for field names and validation rules.
 """
 
-from typing import Final  # noqa: F401  - kept for parity with other modules.
-
+from typing import Literal
 from pydantic import BaseModel, Field
 
-
-# ---------------------------------------------------------------------------
-# Checkpointing - related types
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------
+# Checkpointing - Related types
+# ----------------------------------------------------------------------------------------------
 class DatasetSnapshotRequest(BaseModel):
     """Request to create a dataset snapshot."""
 
@@ -36,8 +34,6 @@ class DatasetSnapshotRequest(BaseModel):
     snapshot_dir: str = Field(
         default="./data_snapshots", description="Directory to store snapshots."
     )
-
-
 class DatasetSnapshotResult(BaseModel):
     """Result describing a materialized dataset snapshot.
 
@@ -84,12 +80,9 @@ class CheckpointInfo(BaseModel):
     loss: float = Field(description="Training loss at this checkpoint")
     timestamp: str = Field(description="ISO timestamp when saved")
 
-
 # ---------------------------------------------------------------------------
 # Activity-level types (training and inference)
 # ---------------------------------------------------------------------------
-
-
 class BertFineTuneConfig(BaseModel):
     """Configuration for a single BERT fine-tuning run.
 
@@ -129,9 +122,9 @@ class BertFineTuneConfig(BaseModel):
         description="Learning rate for the optimizer.",
     )
     max_seq_length: int = Field(
+        default=128,
         gt=8,
         le=512,
-        default=128,
         description="Maximum sequence length for tokenization.",
     )
     use_gpu: bool = Field(
@@ -153,7 +146,32 @@ class BertFineTuneConfig(BaseModel):
             "Set to None to evaluate on the full validation set."
         ),
     )
+    text_field: str | None = Field(default=None, description="Primary text column name.")
+    text_pair_field: str | None = Field(
+        default=None, description="Optional second text column for pair tasks."
+    )
+    label_field: str | None = Field(
+        default=None, description="Label column name (e.g., 'label', 'labels', 'target')."
+    )
+    task_type: Literal["auto", "classification", "regression"] = Field(
+        default="auto",
+        description="Task type. 'auto' infers from dataset features.",
+    )
+    shuffle_before_select: bool = Field(
+        default=True,
+        description=(
+            "Whether to shuffle the dataset before applying max_train_samples "
+            "or max_eval_samples. Improves representativeness for small demo runs."
+        ),
+    )
+    seed: int = Field(
+        default=42,
+        description="Random seed used for dataset shuffling and train/validation splits.",
+    )
 
+    run_id: str | None = Field(
+        default=None, description="Logical identifier for this fine-tuning run."
+    )
 
 class BertFineTuneRequest(BaseModel):
     """Input to a BERT fine-tuning activity run."""
@@ -173,7 +191,6 @@ class BertFineTuneRequest(BaseModel):
     resume_from_checkpoint: str | None = Field(
         default=None, description="Path to checkpoint to resume from (if retrying)"
     )
-
 
 class BertFineTuneResult(BaseModel):
     """Summary metrics from a BERT fine-tuning run."""
@@ -209,7 +226,6 @@ class BertFineTuneResult(BaseModel):
         description="Total number of checkpoints saved during training.",
     )
 
-
 class BertInferenceRequest(BaseModel):
     """Input to a BERT inference activity run."""
 
@@ -231,7 +247,6 @@ class BertInferenceRequest(BaseModel):
         description="Whether to use GPU/MPS for inference if available.",
     )
 
-
 class BertInferenceResult(BaseModel):
     """Inference results for a batch of texts using a fine-tuned BERT model."""
 
@@ -249,12 +264,9 @@ class BertInferenceResult(BaseModel):
         description="Confidence scores (max softmax probability) per prediction.",
     )
 
-
 # ---------------------------------------------------------------------------
 # Workflow-level types
 # ---------------------------------------------------------------------------
-
-
 class BertExperimentInput(BaseModel):
     """Input to the BERT fine-tuning workflow.
 

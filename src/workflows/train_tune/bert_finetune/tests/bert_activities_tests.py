@@ -6,13 +6,15 @@ import pytest
 from temporalio.testing import ActivityEnvironment
 
 from src.workflows.train_tune.bert_finetune.bert_activities import (
+    fine_tune_bert,
+    run_bert_inference,
+)
+from src.workflows.train_tune.bert_finetune.custom_types import (
     BertFineTuneConfig,
     BertFineTuneRequest,
     BertFineTuneResult,
     BertInferenceRequest,
     BertInferenceResult,
-    fine_tune_bert,
-    run_bert_inference,
 )
 
 

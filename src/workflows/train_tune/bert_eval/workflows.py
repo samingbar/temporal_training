@@ -16,20 +16,19 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from src.workflows.train_tune.bert_checkpointing.custom_types import (
+    from src.workflows.train_tune.bert_eval.custom_types import (
+        BertEvalRequest,
+        BertEvalResult,
         BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,
         BertInferenceRequest,
         BertInferenceResult,
         CheckpointInfo,
+        CoordinatorWorkflowConfig,
+        CoordinatorWorkflowInput,
         DatasetSnapshotRequest,
         DatasetSnapshotResult,
-    )
-    from src.workflows.train_tune.bert_eval.custom_types import (
-        BertEvalRequest,
-        BertEvalResult,
-        CoordinatorWorkflowInput,
     )
 
 
@@ -202,52 +201,108 @@ class BertEvalWorkflow:
 
 @workflow.defn
 class CoordinatorWorkflow:
-    """Workflow that coordinates checkpointed training, inference, and evaluation."""
+    """Coordinate checkpointed training and evaluation for one or more configs.
+
+    From a caller's perspective this workflow turns a list of
+    :class:`CoordinatorWorkflowConfig` objects into a list of
+    :class:`BertEvalResult` objects. Internally it:
+
+    - Normalizes and propagates a single ``run_id`` across training/eval
+      configs so all artifacts live under ``./bert_runs/{run_id}``.
+    - Starts a child :class:`CheckpointedBertTrainingWorkflow` per config.
+    - Once all training runs are finished, starts a matching
+      :class:`BertEvalWorkflow` per config and returns the results.
+    """
 
     def __init__(self):
-        self.run_id = None
+        self.run_ids = []
+
+    def set_run_id(self, cfg: CoordinatorWorkflowConfig) -> None:
+        """Choose and propagate a canonical ``run_id`` for a config.
+
+        The same logical ``run_id`` is written into the high-level config, the
+        nested fine-tuning config, and the evaluation config so that downstream
+        activities can locate checkpoints and logs by directory alone.
+        """
+        # Normalize run_id across the coordinator-level config, training config,
+        # and evaluation config so that a single logical identifier flows
+        # through training and evaluation.
+        if cfg.run_id:
+            canonical_run_id = cfg.run_id
+        elif cfg.fine_tune_config.run_id:
+            canonical_run_id = cfg.fine_tune_config.run_id
+        elif cfg.evaluation_config.run_id:
+            canonical_run_id = cfg.evaluation_config.run_id
+        else:
+            workflow.logger.info("No run id provided, generating a new one.")
+            canonical_run_id = str(workflow.uuid4())
+
+        cfg.run_id = canonical_run_id
+        cfg.fine_tune_config.run_id = canonical_run_id
+        cfg.evaluation_config.run_id = canonical_run_id
+        self.run_ids.append(canonical_run_id)
+
+        # If the caller did not explicitly choose a model_path for evaluation,
+        # default it to the run-scoped directory that training writes to. This
+        # keeps all path decisions centralized in the coordinator.
+        if cfg.evaluation_config.model_path is None:
+            cfg.evaluation_config.model_path = f"./bert_runs/{canonical_run_id}"
 
     @workflow.run
-    async def run(self, input: CoordinatorWorkflowInput) -> BertEvalResult:
-        """Execute the coordinator workflow."""
-        workflow.logger.info("Coordinator workflow started")
-
-        await workflow.execute_child_workflow(
-            CheckpointedBertTrainingWorkflow.run,
-            BertFineTuneConfig(
-                model_name=input.fine_tune_config.model_name,
-                dataset_name=input.fine_tune_config.dataset_name,
-                dataset_config_name=input.fine_tune_config.dataset_config_name,
-                num_epochs=input.fine_tune_config.num_epochs,
-                batch_size=input.fine_tune_config.batch_size,
-                learning_rate=input.fine_tune_config.learning_rate,
-                max_seq_length=input.fine_tune_config.max_seq_length,
-                use_gpu=bool(input.fine_tune_config.use_gpu),
-                max_train_samples=input.fine_tune_config.max_train_samples,
-                max_eval_samples=input.fine_tune_config.max_eval_samples,
-            ),
-            id="checkpointed-bert-training-workflow",
-            task_queue="bert-training-task-queue",
+    async def run(self, input: CoordinatorWorkflowInput) -> list[BertEvalResult]:
+        """Execute the coordinator workflow and return per-config evaluation results."""
+        workflow.logger.info(
+            "Coordinator workflow started with %s config(s)", len(input.configs)
         )
 
-        result = await workflow.execute_child_workflow(
-            BertEvalWorkflow.run,
-            BertEvalRequest(
-                run_id=self.run_id,
-                dataset_name=input.evaluation_config.dataset_name,
-                dataset_config_name=input.evaluation_config.dataset_config_name,
-                split=input.evaluation_config.split,
-                max_eval_samples=input.fine_tune_config.max_eval_samples,
-                max_seq_length=input.evaluation_config.max_seq_length,
-                batch_size=input.evaluation_config.batch_size,
-                use_gpu=bool(input.evaluation_config.use_gpu),
-            ),
-            id=f"bert-eval-workflow-{self.run_id}",
-        )
-        workflow.logger.info("Coordinator workflow completed")
-        return result
+        eval_results: list[BertEvalResult] = []
 
-    @workflow.signal
-    def set_run_id(self, request: dict) -> None:
-        """Receive the training run_id from the training workflow."""
-        self.run_id = request.get("run_id")
+        # Step 1: normalize run IDs and launch checkpointed training children.
+        for config in input.configs:
+            self.set_run_id(cfg=config)
+
+            await workflow.execute_child_workflow(
+                CheckpointedBertTrainingWorkflow.run,
+                BertFineTuneConfig(
+                    run_id=config.run_id,
+                    model_name=config.fine_tune_config.model_name,
+                    dataset_name=config.fine_tune_config.dataset_name,
+                    dataset_config_name=config.fine_tune_config.dataset_config_name,
+                    num_epochs=config.fine_tune_config.num_epochs,
+                    batch_size=config.fine_tune_config.batch_size,
+                    learning_rate=config.fine_tune_config.learning_rate,
+                    max_seq_length=config.fine_tune_config.max_seq_length,
+                    use_gpu=bool(config.fine_tune_config.use_gpu),
+                    max_train_samples=config.fine_tune_config.max_train_samples,
+                    max_eval_samples=config.fine_tune_config.max_eval_samples,
+                    seed=config.fine_tune_config.seed,
+                ),
+                id=f"checkpointed-bert-training-workflow-{config.run_id}",
+                task_queue="bert-training-task-queue",
+            )
+
+        # Step 2: fan out evaluation workflows, one per training run.
+        for config in input.configs:
+            eval_result: BertEvalResult = await workflow.execute_child_workflow(
+                BertEvalWorkflow.run,
+                BertEvalRequest(
+                    run_id=config.run_id,
+                    dataset_name=config.evaluation_config.dataset_name,
+                    dataset_config_name=config.evaluation_config.dataset_config_name,
+                    split=config.evaluation_config.split,
+                    max_eval_samples=config.evaluation_config.max_eval_samples,
+                    max_seq_length=config.evaluation_config.max_seq_length,
+                    batch_size=config.evaluation_config.batch_size,
+                    use_gpu=bool(config.evaluation_config.use_gpu),
+                    model_path=config.evaluation_config.model_path,
+                    seed=config.evaluation_config.seed,
+                ),
+                id=f"bert-eval-workflow-{config.run_id}",
+                task_queue="bert-eval-task-queue",
+            )
+            eval_results.append(eval_result)
+
+        workflow.logger.info(
+            "Coordinator workflow completed with %s evaluation run(s)", len(eval_results)
+        )
+        return eval_results

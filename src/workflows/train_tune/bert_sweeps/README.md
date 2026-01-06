@@ -21,7 +21,8 @@ At a high level:
   and prints a concise summary of results.
 
 ## Features
-This workflow highlights temporal capabilities, including:
+
+This workflow highlights Temporal capabilities, including:
 - **Resource Isolation**: isolating code for infra and science teams into dedicated activity classes, separate from orchestration workflows or worker code. 
 - **Debug & Continue**: Debug crashes, bring down your workers, delpoy a new version, and continue right where your sweep left off without missing a beat
 - **Dataset Checkpointing**: Datasets are persisted before training, allowing you to reproduce a past run exactly using only the information captured by temporal and the snapshotted dataset. This also ensures reproducibility is not lost if the dataset is later updated. 
@@ -31,7 +32,7 @@ This workflow highlights temporal capabilities, including:
 
 - **TPE Based Scaling Ladders**: See how Temporal takes the stress away during large experimentation runs as a context manager, ensuring large and complicated orchestration happens reliably and consistently. Temporal is not limited to acyclic workflows like DAGs, and can be used to code looping behaviors, including loops with human in the loop steps, with ease. 
 
-This demo is just a starting point. Take a look and don't hesitate to ask questions!! 
+This demo is just a starting point. Take a look and don't hesitate to ask questions.
 
 ## Prerequisites
 
@@ -110,6 +111,21 @@ These steps assume you are in the project root (`temporal_training/`).
    - Fine-tuned models and tokenizers are written under `./bert_runs/{run_id}`.
    - Dataset snapshots (if enabled) are written under `./data_snapshots`.
 
+## Durability demo
+
+To exercise Temporal’s durability with this sweep:
+
+1. Start both workers (`training_worker` and `worker`) as described above.
+2. Launch the ladder sweep via `starter.py`.
+3. Once several trials are in flight, **kill the training worker** (Ctrl‑C).
+4. Restart the training worker:
+   ```bash
+   uv run -m src.workflows.train_tune.bert_sweeps.training_worker
+   ```
+5. Observe in Temporal Web and logs that workflows continue from their last recorded state, and the sweep still completes with a coherent set of results.
+
+Because all side effects live in activities, workflows can be safely replayed and retried without double‑applying updates.
+
 ## Customizing the Sweep
 
 - Edit `ladder_config_1` in `starter.py` to:
@@ -127,3 +143,10 @@ Because all randomness flows through Temporal's deterministic RNG, you can
 re-run the same sweep with the same `SweepRequest.seed` and expect identical
 trial configurations and ordering, which makes this a good template for
 reproducible experimentation.
+
+## Why Temporal (for this example)
+
+- **Durable hyperparameter sweeps**: Long-running experiments survive crashes and worker restarts.
+- **Deterministic experimentation**: Sweeps are repeatable because randomness flows through Temporal’s deterministic APIs.
+- **Code-first orchestration**: Complex ladder/TPE behavior is expressed in Python workflows, not YAML.
+- **Clear separation of concerns**: Activities own ML logic; workflows own orchestration and experiment structure.

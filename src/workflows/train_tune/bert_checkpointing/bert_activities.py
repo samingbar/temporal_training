@@ -31,27 +31,14 @@ from src.workflows.train_tune.bert_checkpointing.custom_types import (
     DatasetSnapshotRequest,
     DatasetSnapshotResult,
 )
-
-try:  # Heavy ML imports are only needed when activities actually run.
-    import torch
-    from datasets import load_dataset
-    from transformers import (
+import torch
+from datasets import load_dataset
+from transformers import (
         AutoModelForSequenceClassification,
         AutoTokenizer,
         Trainer,
         TrainingArguments,
     )
-except Exception:  # noqa: BLE001
-    # The unit tests patch out the sync helpers, so importing ML deps is optional
-    # for test runs. At runtime, the helpers below will raise a clear error if
-    # the libraries are missing.
-    torch = None  # type: ignore[assignment]
-    load_dataset = None  # type: ignore[assignment]
-    AutoModelForSequenceClassification = None  # type: ignore[assignment]
-    AutoTokenizer = None  # type: ignore[assignment]
-    Trainer = None  # type: ignore[assignment]
-    TrainingArguments = None  # type: ignore[assignment]
-
 
 # Human-friendly error message surfaced when ML dependencies are missing. This keeps
 # the Temporal worker process healthy even if the Python environment is not configured
@@ -66,7 +53,9 @@ TRANSFORMERS_IMPORT_MESSAGE: Final[str] = (
 # both local development and the 5s per-test timeout configured in pytest.
 HEARTBEAT_INTERVAL_SECONDS: Final[float] = 5.0
 
-
+# -------------------------------------------------------------------------------
+# Fine Tuning Activities
+# -------------------------------------------------------------------------------
 class BertFineTuneActivities:
     """Activity collection for checkpoint-aware BERT fine-tuning."""
 
@@ -278,7 +267,9 @@ class BertFineTuneActivities:
         )
         return result
 
-
+# -------------------------------------------------------------------------------
+# TEMP: Inference Activity 
+# -------------------------------------------------------------------------------
 class BertInferenceActivities:
     def __init__(self):
         pass
@@ -354,23 +345,20 @@ class BertInferenceActivities:
         )
         return result
 
-
+# -------------------------------------------------------------------------------
+# Checkpointing Activities
+# -------------------------------------------------------------------------------
 class BertCheckpointingActivities:
-    def __init__(self) -> None:
-        self.config = None
-
-    def _create_dataset_snapshot_sync(
-        self, request: DatasetSnapshotRequest
-    ) -> DatasetSnapshotResult:
-        """Create a dataset snapshot synchronously.
-
-        This helper is synchronous; the async activity delegates to it via
-        ``asyncio.to_thread`` for non-blocking execution.
+    @staticmethod
+    def _create_dataset_snapshot_sync(request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
+        """Create a dataset snapshot synchronously.This helper is synchronous;
+        the async activity delegates to it via ``asyncio.to_thread`` for non-blocking execution.
         """
         # Load the dataset
         raw_datasets = load_dataset(
             request.dataset_name,
             request.dataset_config,
+            trust_remote_code=True,  # Turn off to disable loading custom dataset scripts
         )
 
         train_dataset = raw_datasets["train"]
@@ -448,10 +436,9 @@ class BertCheckpointingActivities:
             snapshot_path=str(snapshot_path),
         )
 
+    @staticmethod
     @activity.defn
-    async def create_dataset_snapshot(
-        self, request: DatasetSnapshotRequest
-    ) -> DatasetSnapshotResult:
+    async def create_dataset_snapshot(request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
         """Temporal activity that creates a versioned dataset snapshot."""
         activity.logger.info(
             "Creating dataset snapshot for %s/%s",
@@ -460,12 +447,12 @@ class BertCheckpointingActivities:
         )
 
         # Offload to thread to avoid blocking worker
-        snapshot = await asyncio.to_thread(self._create_dataset_snapshot_sync, request)
+        snapshot = await asyncio.to_thread(
+            BertCheckpointingActivities._create_dataset_snapshot_sync, request
+        )
 
         activity.logger.info(
-            "Dataset snapshot ready: %s (hash: %s)",
-            snapshot.snapshot_id,
-            snapshot.data_hash,
+            "Dataset snapshot ready: %s (hash: %s)", snapshot.snapshot_id, snapshot.data_hash
         )
 
         return snapshot
