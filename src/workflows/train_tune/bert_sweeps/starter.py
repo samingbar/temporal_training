@@ -264,7 +264,10 @@ ladder_config_1 = SweepRequest(
     base=config_6,
     space=SweepSpace(
         learning_rate=(5e-5, 1e-5),
-        batch_size=[2, 32], # TODO: Increase batch size in each rung of the ladder, instead of using the ladder to select batch size. Currently, the approach heavily biases towards small batch sizes.
+        batch_size=[
+            2,
+            32,
+        ],  # TODO: Increase batch size in each rung of the ladder, instead of using the ladder to select batch size. Currently, the approach heavily biases towards small batch sizes.
         num_epochs=[2, 8],
         max_seq_length=[64, 256],
     ),

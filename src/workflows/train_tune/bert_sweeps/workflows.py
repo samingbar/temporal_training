@@ -753,16 +753,16 @@ class LadderSweepWorkflow:
                 ablation_cfg.fine_tune_config.num_epochs = base_epochs
                 ablation_cfg.fine_tune_config.max_train_samples = base_max_train
 
-                ablation_cfg.evaluation_config.batch_size = (
-                    ablation_cfg.fine_tune_config.batch_size
-                )
+                ablation_cfg.evaluation_config.batch_size = ablation_cfg.fine_tune_config.batch_size
                 ablation_cfg.evaluation_config.max_seq_length = (
                     ablation_cfg.fine_tune_config.max_seq_length
                 )
-                if ablation_cfg.evaluation_config.model_path is None:
-                    ablation_cfg.evaluation_config.model_path = (
-                        f"./bert_runs/{ablation_run_id}"
-                    )
+
+                old_default = f"./bert_runs/{best_cfg.run_id}"
+                new_default = f"./bert_runs/{ablation_run_id}"
+
+                if ablation_cfg.evaluation_config.model_path in (None, old_default):
+                    ablation_cfg.evaluation_config.model_path = new_default
 
                 try:
                     seed = await workflow.execute_activity(
@@ -821,9 +821,12 @@ class LadderSweepWorkflow:
         best_cfg.evaluation_config.run_id = best_cfg.run_id
         best_cfg.evaluation_config.batch_size = best_cfg.fine_tune_config.batch_size
         best_cfg.evaluation_config.max_seq_length = best_cfg.fine_tune_config.max_seq_length
-        if best_cfg.evaluation_config.model_path is None:
-            best_cfg.evaluation_config.model_path = f"./bert_runs/{best_cfg.run_id}"
 
+        old_default = f"./bert_runs/{best_cfg.run_id}"
+        new_default = f"./bert_runs/{ablation_run_id}"
+
+        if best_cfg.evaluation_config.model_path in (None. old_default):
+            best_cfg.evaluation_config.model_path = new_default
         best_result = await LadderSweepWorkflow._run_one_cfg(sem, best_cfg, "best-fallback")
 
         # Best-effort ablation in the fallback path as well: use the same
@@ -856,9 +859,7 @@ class LadderSweepWorkflow:
 
             ablation_result = await LadderSweepWorkflow._run_one_cfg(sem, ablation_cfg, "ablation")
             best_result.baseline_accuracy = ablation_result.accuracy
-            best_result.improvement_vs_baseline = (
-                best_result.accuracy - ablation_result.accuracy
-            )
+            best_result.improvement_vs_baseline = best_result.accuracy - ablation_result.accuracy
         except Exception:
             workflow.logger.warning(
                 "Fallback ablation run for best configuration %s failed; "
