@@ -19,6 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, HttpUrl
 
+
 class BatchInferenceItem(BaseModel):
     """A single item to be sent to the model for inference.
 
@@ -49,6 +50,7 @@ class BatchInferenceInput(BaseModel):
 
     per_request_timeout_seconds: float = 5.0
     """Timeout for each underlying activity HTTP request."""
+
 
 class BatchInferenceOutput(BaseModel):
     """Aggregated output for batch inference.
@@ -86,6 +88,7 @@ class InferenceResponse(BaseModel):
     Either ``output`` will be populated with parsed JSON on success, or ``error``
     will contain a human-readable message on failure (including transport errors).
     """
+
     status_code: int
     """HTTP status code returned by the endpoint."""
 
@@ -95,6 +98,7 @@ class InferenceResponse(BaseModel):
     error: str | None = None
     """Error message, if the request failed or response was invalid."""
 
+
 __all__ = [
     "BatchInferenceItem",
     "BatchInferenceInput",
@@ -102,5 +106,3 @@ __all__ = [
     "InferenceRequest",
     "InferenceResponse",
 ]
-
-

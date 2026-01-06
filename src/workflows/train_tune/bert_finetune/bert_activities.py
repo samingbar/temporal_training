@@ -133,7 +133,7 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     model.to(device)
 
     # -------------------------------------------------------------------------
-        # 5. Configure the Transformers Trainer.
+    # 5. Configure the Transformers Trainer.
     #
     # The Trainer owns the training loop, evaluation, and logging. The choice
     # of hyperparameters here is intentionally simple and tuned for readability
@@ -142,18 +142,18 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
     # Note: Transformers 4.57.1 uses `eval_strategy` instead of the older
     # `evaluation_strategy` argument.
     # -------------------------------------------------------------------------
-        training_args = TrainingArguments(
-            output_dir=f"./bert_runs/{request.run_id}",
-            num_train_epochs=float(config.num_epochs),
-            per_device_train_batch_size=config.batch_size,
-            per_device_eval_batch_size=config.batch_size,
-            learning_rate=config.learning_rate,
-            eval_strategy="epoch" if eval_dataset is not None else "no",
-            save_strategy="no",
-            logging_strategy="epoch",
-            report_to=[],
-            load_best_model_at_end=False,
-        )
+    training_args = TrainingArguments(
+        output_dir=f"./bert_runs/{request.run_id}",
+        num_train_epochs=float(config.num_epochs),
+        per_device_train_batch_size=config.batch_size,
+        per_device_eval_batch_size=config.batch_size,
+        learning_rate=config.learning_rate,
+        eval_strategy="epoch" if eval_dataset is not None else "no",
+        save_strategy="no",
+        logging_strategy="epoch",
+        report_to=[],
+        load_best_model_at_end=False,
+    )
 
     def compute_metrics(eval_pred):
         logits, labels = eval_pred

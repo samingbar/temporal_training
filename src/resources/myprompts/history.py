@@ -20,5 +20,6 @@ class PromptHistory(BaseModel):
     def to_messages(self, provider: LLMProvider):
         prompts = [entry.prompt for entry in self.entries]
         return PromptAssembly(prompts=prompts).build(provider=provider)
+
     def reset(self):
         self.entries = []

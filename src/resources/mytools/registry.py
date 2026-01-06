@@ -5,6 +5,7 @@ from pydantic import BaseModel
 TOOL_REGISTRY = []
 DISPATCH_TABLE = {}
 
+
 def build_schema_from_pydantic_model(model: type[BaseModel]):
     """Return JSON schema for Gemini from a Pydantic model."""
     schema = model.model_json_schema()
@@ -27,11 +28,7 @@ def build_schema_from_pydantic_model(model: type[BaseModel]):
         else:
             props[name] = {"type": ptype}
 
-    return {
-        "type": "object",
-        "properties": props,
-        "required": required
-    }
+    return {"type": "object", "properties": props, "required": required}
 
 
 def build_schema_from_function(func):
@@ -47,7 +44,7 @@ def build_schema_from_function(func):
 
     # Case 1: Pydantic model as the ONLY argument
     if len(sig.parameters) == 1:
-        (param_name, param), = sig.parameters.items()
+        ((param_name, param),) = sig.parameters.items()
 
         annotation = hints.get(param_name)
 
@@ -57,7 +54,7 @@ def build_schema_from_function(func):
             return {
                 "name": func.__name__,
                 "description": func.__doc__ or "",
-                "parameters": params_schema
+                "parameters": params_schema,
             }
 
     # Case 2: Standard type-hinted Python function
@@ -88,11 +85,7 @@ def build_schema_from_function(func):
     return {
         "name": func.__name__,
         "description": func.__doc__ or "",
-        "parameters": {
-            "type": "object",
-            "properties": props,
-            "required": required
-        }
+        "parameters": {"type": "object", "properties": props, "required": required},
     }
 
 

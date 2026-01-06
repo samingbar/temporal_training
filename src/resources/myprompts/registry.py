@@ -11,4 +11,3 @@ def register_prompt(name: str, prompt: BasePrompt):
 
 def get_prompt(name: str) -> BasePrompt:
     return PROMPT_LIBRARY[name]
-

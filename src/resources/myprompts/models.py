@@ -10,7 +10,6 @@ GEMINI_ALLOWED_ROLES = {"user", "model"}
 from .provider import LLMProvider
 
 
-
 def map_role_to_openai(role: str) -> str:
     role = role.lower()
     return role if role in OPENAI_ROLES else "user"
@@ -20,7 +19,7 @@ def map_role_to_gemini(role: str) -> str:
     role = role.lower()
 
     if role == "system":
-        return "user"      # Gemini has no system role
+        return "user"  # Gemini has no system role
     if role == "assistant":
         return "model"
     if role == "tool":
@@ -28,9 +27,11 @@ def map_role_to_gemini(role: str) -> str:
 
     return "user"
 
+
 # ============================================================
 # Base Prompt
 # ============================================================
+
 
 class BasePrompt(BaseModel):
     role: str = "user"
@@ -40,16 +41,15 @@ class BasePrompt(BaseModel):
         """
         Return a Gemini `Content`-compatible structure.
         """
-        return [{
-            "role": map_role_to_gemini(self.role),
-            "parts": [{"text": self.text}],
-        }]
+        return [
+            {
+                "role": map_role_to_gemini(self.role),
+                "parts": [{"text": self.text}],
+            }
+        ]
 
     def to_openai(self) -> List[Dict[str, str]]:
-        return [{
-            "role": map_role_to_openai(self.role),
-            "content": self.text
-        }]
+        return [{"role": map_role_to_openai(self.role), "content": self.text}]
 
     def to_messages(self, provider: LLMProvider = LLMProvider.GEMINI) -> List[Dict[str, str]]:
         if provider == LLMProvider.GEMINI:
@@ -63,6 +63,7 @@ class BasePrompt(BaseModel):
 # Specific Prompt Types
 # -------------------------
 
+
 class SystemPrompt(BasePrompt):
     role: str = "system"
 
@@ -73,22 +74,28 @@ class UserPrompt(BasePrompt):
 
 class TaskPrompt(BasePrompt):
     """Represents a high-level user task"""
+
     role: str = "user"
+
 
 class InitialPlanPrompt(BasePrompt):
     role: str = "user"
 
+
 class ModelPrompt(BasePrompt):
     role: str = "assistant"
+
 
 # -------------------------
 # MessageBlock for multi-part prompts
 # -------------------------
 
+
 class MessageBlock(BaseModel):
     """
     Represents multi-part content prompts, such as context + instructions.
     """
+
     role: str
     content: List[str]
 
@@ -128,4 +135,3 @@ class MessageBlock(BaseModel):
             return self.to_openai()
         else:
             raise ValueError(f"Unknown provider: {provider}")
-

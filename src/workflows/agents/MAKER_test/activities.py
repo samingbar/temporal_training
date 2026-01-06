@@ -10,18 +10,21 @@ from temporalio import activity
 from google import genai
 from pydantic import BaseModel
 
-from src.resources.mytools import (TOOL_DISPATCH, OPENAI_TOOLS, load_tool_modules)
-from src.workflows.agents.MAKER_test.agent_types import AgentStepInput, AgentStepOutput, ToolCall, LlmResponse
+from src.resources.mytools import TOOL_DISPATCH, OPENAI_TOOLS, load_tool_modules
+from src.workflows.agents.MAKER_test.agent_types import (
+    AgentStepInput,
+    AgentStepOutput,
+    ToolCall,
+    LlmResponse,
+)
 from .config import PROVIDER, MODEL
 
 # Dynamically load the app-specific tool module.
 # We use the fully-qualified package path to avoid ambiguity.
-#load_tool_modules("src.workflows.gemini_research_agent.company_research_tools") # Uncomment and update the path if you want to add support for custom tools. See the mytools packlage in resources for more information.
+# load_tool_modules("src.workflows.gemini_research_agent.company_research_tools") # Uncomment and update the path if you want to add support for custom tools. See the mytools packlage in resources for more information.
 
 
-
-
-#Set provider based on config (Supports OpenAI, Gemini; tested on Gemini)
+# Set provider based on config (Supports OpenAI, Gemini; tested on Gemini)
 def _provider_name(provider) -> str:
     if hasattr(provider, "value"):
         return str(getattr(provider, "value")).lower()
@@ -30,7 +33,7 @@ def _provider_name(provider) -> str:
 
 _PROVIDER_NAME = _provider_name(PROVIDER)
 
-#Launch LLM Client
+# Launch LLM Client
 if _PROVIDER_NAME == "gemini":
     _llm_client = genai.Client()
 elif _PROVIDER_NAME == "openai":
@@ -44,31 +47,31 @@ elif _PROVIDER_NAME == "openai":
 else:
     raise NotImplementedError(f"Unsupported LLM provider for activities: {PROVIDER!r}")
 
-#This activity sends a message to an LLM and Returns the output. It is tailiored to provide output structure for this specfic X+1 usecase.
+
+# This activity sends a message to an LLM and Returns the output. It is tailiored to provide output structure for this specfic X+1 usecase.
 @activity.defn
 async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
     contents = step.messages
 
-    #Gemini Call Handling
+    # Gemini Call Handling
     if _PROVIDER_NAME == "gemini":
-
-        #Define output structure
+        # Define output structure
         config = {
             "response_mime_type": "application/json",
             "response_json_schema": LlmResponse.model_json_schema(),
         }
 
-        #Call Gemini model
+        # Call Gemini model
         resp = _llm_client.models.generate_content(
             model=MODEL,
             contents=contents,
             config=config,
         )
 
-        #Parse the response
+        # Parse the response
         candidates = getattr(resp, "candidates", None) or []
-        
-        #If empty response or no response return whole response as plain text.
+
+        # If empty response or no response return whole response as plain text.
         if not candidates or not getattr(candidates[0], "content", None):
             txt = str(resp)
             return AgentStepOutput(
@@ -76,12 +79,12 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
                 output_text=txt,
                 model_message={},
             )
-        
-        #Grab the response message and check for multiple parts
+
+        # Grab the response message and check for multiple parts
         msg = candidates[0].content
         parts = getattr(msg, "parts", None) or []
 
-        #If no parts, return the message
+        # If no parts, return the message
         if not parts:
             txt = str(msg)
             return AgentStepOutput(
@@ -94,7 +97,7 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
         part = parts[0]
         func_call = getattr(part, "function_call", None)
 
-        #If a function call is specified, return it
+        # If a function call is specified, return it
         if func_call:
             return AgentStepOutput(
                 is_final=False,
@@ -112,20 +115,17 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
 
         normalized = txt.strip().lower()
 
-        # Treat as final only if the model explicitly marks it as such. 
-        is_final = normalized.startswith("final answer:") or normalized.startswith(
-            "final answer"
-        )
+        # Treat as final only if the model explicitly marks it as such.
+        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
 
         return AgentStepOutput(
             is_final=is_final,
             output_text=txt,
             model_message={"role": getattr(msg, "role", None)},
         )
-        
-    #OpenAI Call Handling
+
+    # OpenAI Call Handling
     if _PROVIDER_NAME == "openai":
-        
         # Call the model and get a response
         response = _llm_client.chat.completions.create(
             model=MODEL,
@@ -134,7 +134,7 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
             tool_choice="auto",
         )
 
-        #Grab the top message choice from the response
+        # Grab the top message choice from the response
         message = response.choices[0].message
 
         # If the model requested a tool call, surface it.
@@ -159,9 +159,7 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
         # Otherwise treat it as a normal assistant message.
         txt = message.content or ""
         normalized = txt.strip().lower()
-        is_final = normalized.startswith("final answer:") or normalized.startswith(
-            "final answer"
-        )
+        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
 
         return AgentStepOutput(
             is_final=is_final,
@@ -171,7 +169,8 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
 
     raise NotImplementedError(f"llm_step_activity not implemented for provider={PROVIDER!r}")
 
-#Generic helper method for tool invocation -- Not utilized by this agent but here as a starter for extending this example
+
+# Generic helper method for tool invocation -- Not utilized by this agent but here as a starter for extending this example
 def _invoke_tool(fn, args: Dict[str, Any]) -> Any:
     sig = inspect.signature(fn)
     params = list(sig.parameters.values())
@@ -187,7 +186,8 @@ def _invoke_tool(fn, args: Dict[str, Any]) -> Any:
 
     return fn(**args)
 
-#Generic activity method for tool calling -- Not utilized by this agent, but here as a starter for extending this example
+
+# Generic activity method for tool calling -- Not utilized by this agent, but here as a starter for extending this example
 @activity.defn
 async def tool_activity(tool_call: ToolCall) -> str:
     tool_fn = TOOL_DISPATCH[tool_call.name]

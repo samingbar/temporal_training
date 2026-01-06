@@ -12,10 +12,11 @@ import json
 from datetime import timedelta
 
 SYSTEM_PROMPT = """ You are an expert that specializes in adding 1 to a provided number. Your only task is to output a JSON object containing n + 1.Output ONLY valid JSON. No quotes, no markdown, no backticks, no explanations."""
-TASK_PROMPT = """ You are given an integer n and optionally conversation history. 
+TASK_PROMPT = """ You are given an integer n and optionally conversation history.
                         Output ONLY: {"result": <n_plus_one>}
                         Do NOT add explanations or any surrounding text."""
 ACTION_PROMPT = """{n}"""
+
 
 @workflow.defn
 class NormalAgentWorkflow:
@@ -59,7 +60,7 @@ class NormalAgentWorkflow:
                     candidate = int(raw_val.strip())
                 else:
                     raise ValueError(f"Non-numeric result type: {type(raw_val)}")
-            except Exception: 
+            except Exception:
                 workflow.logger.error("Parse failure for step %s: %s", self.step, msg)
                 break
 
@@ -80,6 +81,7 @@ class NormalAgentWorkflow:
         workflow.logger.info(f"Failed after {self.step} steps. Incorrect result = {n}")
         return self.step
 
+
 @workflow.defn
 class MakerWorkflow:
     """Workflow that repeatedly adds 1 to a number until it renders an incorrect result"""
@@ -88,9 +90,8 @@ class MakerWorkflow:
         self.history = PromptHistory()
         self.step = 0
 
-
     @workflow.run
-    async def run(self):  
+    async def run(self):
         """Build a provider-specific message list for the given task."""
 
         # Build initial prompt history
@@ -102,16 +103,16 @@ class MakerWorkflow:
 
         # Set up loop inputs
         next_input = AgentStepInput(messages=struct_hist)
-        k = 3 # K is the 'win value' during response voting
-       
+        k = 3  # K is the 'win value' during response voting
+
         # Loop as long as the MAKER consensus equals the expected n+1
         while self.step == n:
             workflow.logger.info("MAKER Step %s, input n=%s", self.step, n)
 
-            #1. Run MAKER voting loop for this step
+            # 1. Run MAKER voting loop for this step
             decided_value = await self._maker_vote(next_input, k)
 
-            #2. Check correctness (task expects n+1)
+            # 2. Check correctness (task expects n+1)
             if decided_value != n + 1:
                 workflow.logger.error(
                     "Incorrect result! Expected %s, got %s",
@@ -120,29 +121,29 @@ class MakerWorkflow:
                 )
                 return {self.step}
 
-            #3. Update state
+            # 3. Update state
             n = decided_value
             self.step += 1
 
-            #4. Rebuild history fresh for the new n
-            self.history.reset() #In MAKER, we reset the history and isolate the next operation into a tiny, atomic unit. 
+            # 4. Rebuild history fresh for the new n
+            self.history.reset()  # In MAKER, we reset the history and isolate the next operation into a tiny, atomic unit.
             self.history.add(SystemPrompt(text=SYSTEM_PROMPT.strip()))
             self.history.add(TaskPrompt(text=TASK_PROMPT.strip()))
             self.history.add(UserPrompt(text=ACTION_PROMPT.format(n=n)))
 
             next_input = AgentStepInput(messages=self.history.to_messages(provider=PROVIDER))
-        
-        #Raise exception if we exit the loop in an unexpected way
+
+        # Raise exception if we exit the loop in an unexpected way
         raise Exception("Unhandled exit of MAKER loop")
-    
-   
-    async def _maker_vote(self, next_input: AgentStepInput, k: int) -> int: #Method for running MAKER voting rounds
+
+    async def _maker_vote(
+        self, next_input: AgentStepInput, k: int
+    ) -> int:  # Method for running MAKER voting rounds
         vote_counts = {}
 
-        #Open a loop that will close when the win threshold is reached
+        # Open a loop that will close when the win threshold is reached
         while True:
-            
-            #1. Start a batch of activities (parallel micro-agents)
+            # 1. Start a batch of activities (parallel micro-agents)
             batch = []
             for _ in range(5):
                 fut = workflow.start_activity(
@@ -154,8 +155,7 @@ class MakerWorkflow:
 
             batch_results = [await item for item in batch]
 
-           
-            #2. Process the batch results
+            # 2. Process the batch results
             for raw in batch_results:
                 if isinstance(raw, dict):
                     raw = AgentStepOutput(**raw)
@@ -195,14 +195,11 @@ class MakerWorkflow:
                 )
 
                 if current >= max_other + k:
-                    workflow.logger.info(
-                        f"VOTED: {val} with votes={vote_counts}"
-                    )
+                    workflow.logger.info(f"VOTED: {val} with votes={vote_counts}")
                     return val
-   
-    #Function for red-flag checking in the MAKER style
-    def red_flag(self, message: str) -> bool:
 
+    # Function for red-flag checking in the MAKER style
+    def red_flag(self, message: str) -> bool:
         # 1. Length-based red flag (very strong signal in paper)
         if len(message) > 120:
             return True
@@ -222,6 +219,3 @@ class MakerWorkflow:
             return "result" not in js
         except:
             return True
-
-    
-  

@@ -29,19 +29,17 @@ Your task is to analyze the strategies of the top 3 competitors for {task_descri
 produce a comparison table with actionable insights.
 """
 
-#Test Gemini Formatting
-assembly = PromptAssembly(prompts=[
-    SystemPrompt(text=SYSTEM_PROMPT),
-    UserPrompt(text=PLANNING_PROMPT_INITIAL_PLAN)
-])
+# Test Gemini Formatting
+assembly = PromptAssembly(
+    prompts=[SystemPrompt(text=SYSTEM_PROMPT), UserPrompt(text=PLANNING_PROMPT_INITIAL_PLAN)]
+)
 
 gemini_msgs = assembly.build(provider=LLMProvider.GEMINI)
 print(f"Gemini Message Output = {gemini_msgs}")
 
-assembly = PromptAssembly(prompts=[
-    SystemPrompt(text=SYSTEM_PROMPT),
-    UserPrompt(text=PLANNING_PROMPT_INITIAL_PLAN)
-])
+assembly = PromptAssembly(
+    prompts=[SystemPrompt(text=SYSTEM_PROMPT), UserPrompt(text=PLANNING_PROMPT_INITIAL_PLAN)]
+)
 
 openai_msgs = assembly.build(provider=LLMProvider.OPENAI)
 print(f"OpenAI Message Output = {openai_msgs}")
