@@ -374,6 +374,21 @@ class BertEvalResult(BaseModel):
         description="Classification accuracy over the evaluated examples.",
     )
 
+    baseline_accuracy: float | None = Field(
+        default=None,
+        description=(
+            "Optional baseline accuracy used for ablation comparison for this result "
+            "(for example, a lower-budget training configuration)."
+        ),
+    )
+    improvement_vs_baseline: float | None = Field(
+        default=None,
+        description=(
+            "Optional improvement in accuracy over the ablation baseline "
+            "(accuracy - baseline_accuracy)."
+        ),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Workflow-level types

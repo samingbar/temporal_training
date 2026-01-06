@@ -593,12 +593,12 @@ class BertFineTuneActivities:
                 pass
 
         # Log a concise summary of training metrics, handling both scalar and dict shapes.
-        if result.eval_accuracy is None:
+        if not result.eval_metrics:
             eval_summary = "N/A"
         else:
             # prefer the common keys HF returns
             key_order = ("eval_accuracy", "accuracy", "eval_loss", "loss", "mse", "rmse", "f1")
-            picked = []
+            picked: list[str] = []
             for k in key_order:
                 if k in result.eval_metrics:
                     picked.append(f"{k}={float(result.eval_metrics[k]):.4f}")

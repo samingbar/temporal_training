@@ -720,10 +720,85 @@ class LadderSweepWorkflow:
                 [(r.run_id, r.accuracy) for r in top[: min(5, len(top))]],
             )
 
-            # Early exit only if (a) we are at the final rung, in which case
-            # we simply return the last ranked results.
+            # Early exit only if (a) we are at the final rung. In that case
+            # we run an ablation-style baseline on the best configuration and
+            # annotate the best result with its improvement over that baseline.
             is_last_stage = stage_idx == len(stages) - 1
             if is_last_stage:
+                if not last_ranked:
+                    return last_ranked
+
+                best_result = last_ranked[0]
+                best_run_id = best_result.run_id
+
+                best_cfg = next((cfg for cfg in stage_cfgs if cfg.run_id == best_run_id), None)
+                if best_cfg is None:
+                    workflow.logger.warning(
+                        "Could not locate config for best run %s; skipping ablation.",
+                        best_run_id,
+                    )
+                    return last_ranked
+
+                # Build an ablation config by reusing the best hyperparameters
+                # but reverting the training budget (epochs / max_train_samples)
+                # to the first ladder stage. This provides a baseline to
+                # quantify how much the full-ladder schedule improved accuracy.
+                ablation_cfg = best_cfg.model_copy(deep=True)
+                ablation_run_id = f"{best_cfg.run_id}-ablation"
+                ablation_cfg.run_id = ablation_run_id
+                ablation_cfg.fine_tune_config.run_id = ablation_run_id
+                ablation_cfg.evaluation_config.run_id = ablation_run_id
+
+                base_epochs, base_max_train, _keep0, _nnew0 = stages[0]
+                ablation_cfg.fine_tune_config.num_epochs = base_epochs
+                ablation_cfg.fine_tune_config.max_train_samples = base_max_train
+
+                ablation_cfg.evaluation_config.batch_size = (
+                    ablation_cfg.fine_tune_config.batch_size
+                )
+                ablation_cfg.evaluation_config.max_seq_length = (
+                    ablation_cfg.fine_tune_config.max_seq_length
+                )
+                if ablation_cfg.evaluation_config.model_path is None:
+                    ablation_cfg.evaluation_config.model_path = (
+                        f"./bert_runs/{ablation_run_id}"
+                    )
+
+                try:
+                    seed = await workflow.execute_activity(
+                        "set_seed",
+                        req.seed,
+                        start_to_close_timeout=timedelta(seconds=10),
+                    )
+                    ablation_cfg.fine_tune_config.seed = seed
+                    ablation_cfg.evaluation_config.seed = seed
+
+                    ablation_result = await LadderSweepWorkflow._run_one_cfg(
+                        sem, ablation_cfg, "ablation"
+                    )
+
+                    best_result.baseline_accuracy = ablation_result.accuracy
+                    best_result.improvement_vs_baseline = (
+                        best_result.accuracy - ablation_result.accuracy
+                    )
+                    workflow.logger.info(
+                        "Ablation baseline for best run %s: baseline_accuracy=%.3f, "
+                        "best_accuracy=%.3f, improvement=%.3f",
+                        best_run_id,
+                        ablation_result.accuracy,
+                        best_result.accuracy,
+                        best_result.improvement_vs_baseline,
+                    )
+                except Exception:
+                    # If the ablation run fails for any reason, we still return
+                    # the final rung leaderboard; the metadata fields remain unset.
+                    workflow.logger.warning(
+                        "Ablation run for best configuration %s failed; "
+                        "returning final rung leaderboard without ablation metadata.",
+                        best_run_id,
+                        exc_info=True,
+                    )
+
                 return last_ranked
 
             # Otherwise keep iterating unless we're down to <= 1 survivor,
@@ -750,4 +825,46 @@ class LadderSweepWorkflow:
             best_cfg.evaluation_config.model_path = f"./bert_runs/{best_cfg.run_id}"
 
         best_result = await LadderSweepWorkflow._run_one_cfg(sem, best_cfg, "best-fallback")
+
+        # Best-effort ablation in the fallback path as well: use the same
+        # hyperparameters but revert training budget to the first stage.
+        try:
+            ablation_cfg = best_cfg.model_copy(deep=True)
+            ablation_run_id = f"{best_cfg.run_id}-ablation"
+            ablation_cfg.run_id = ablation_run_id
+            ablation_cfg.fine_tune_config.run_id = ablation_run_id
+            ablation_cfg.evaluation_config.run_id = ablation_run_id
+
+            base_epochs, base_max_train, _keep0, _nnew0 = stages[0]
+            ablation_cfg.fine_tune_config.num_epochs = base_epochs
+            ablation_cfg.fine_tune_config.max_train_samples = base_max_train
+
+            ablation_cfg.evaluation_config.batch_size = ablation_cfg.fine_tune_config.batch_size
+            ablation_cfg.evaluation_config.max_seq_length = (
+                ablation_cfg.fine_tune_config.max_seq_length
+            )
+            if ablation_cfg.evaluation_config.model_path is None:
+                ablation_cfg.evaluation_config.model_path = f"./bert_runs/{ablation_run_id}"
+
+            seed = await workflow.execute_activity(
+                "set_seed",
+                req.seed,
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+            ablation_cfg.fine_tune_config.seed = seed
+            ablation_cfg.evaluation_config.seed = seed
+
+            ablation_result = await LadderSweepWorkflow._run_one_cfg(sem, ablation_cfg, "ablation")
+            best_result.baseline_accuracy = ablation_result.accuracy
+            best_result.improvement_vs_baseline = (
+                best_result.accuracy - ablation_result.accuracy
+            )
+        except Exception:
+            workflow.logger.warning(
+                "Fallback ablation run for best configuration %s failed; "
+                "returning best result without ablation metadata.",
+                best_cfg.run_id,
+                exc_info=True,
+            )
+
         return [best_result]

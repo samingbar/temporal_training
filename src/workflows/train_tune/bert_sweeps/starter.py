@@ -264,11 +264,11 @@ ladder_config_1 = SweepRequest(
     base=config_6,
     space=SweepSpace(
         learning_rate=(5e-5, 1e-5),
-        batch_size=[2, 32],
+        batch_size=[2, 32], # TODO: Increase batch size in each rung of the ladder, instead of using the ladder to select batch size. Currently, the approach heavily biases towards small batch sizes.
         num_epochs=[2, 8],
         max_seq_length=[64, 256],
     ),
-    num_trials=25,  # increase this for actual research, but ensure the machine has enough compute and memory or move to an autoscaling cluster
+    num_trials=12,  # increase this for actual research, but ensure the machine has enough compute and memory or move to an autoscaling cluster
     max_concurrency=4,
     seed=random.randint(0, 10000),
 )
@@ -314,6 +314,19 @@ async def main() -> None:
             f"{item.split:<10} "
             f"{item.num_examples:>10} "
             f"{item.accuracy:>9.3f}",
+        )
+
+    # If the ladder workflow annotated the best result with ablation metadata,
+    # print the improvement in accuracy over the ablation baseline.
+    best = results[0]
+    baseline = getattr(best, "baseline_accuracy", None)
+    improvement = getattr(best, "improvement_vs_baseline", None)
+    if baseline is not None and improvement is not None:
+        print(
+            "\nBest run "
+            f"{best.run_id} improved accuracy by {improvement:.3f} "
+            f"over the ablation baseline "
+            f"(baseline={baseline:.3f}, best={best.accuracy:.3f}).",
         )
 
 

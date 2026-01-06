@@ -101,6 +101,11 @@ class TestBertSweepsWorkflows:
                 accuracy=0.9,
             )
 
+        @activity.defn(name="set_seed")
+        async def set_seed_mocked(seed: int) -> int:
+            """Mocked seed-jitter activity used by ladder sweeps."""
+            return seed
+
         async with Worker(
             client,
             task_queue=task_queue,
@@ -114,6 +119,7 @@ class TestBertSweepsWorkflows:
                 create_dataset_snapshot_mocked,
                 fine_tune_bert_mocked,
                 evaluate_bert_model_mocked,
+                set_seed_mocked,
             ],
             activity_executor=ThreadPoolExecutor(5),
         ):
