@@ -258,7 +258,7 @@ config_7 = CoordinatorWorkflowConfig(
 # can be grouped together in logs and under ``./bert_runs``.
 ladder_id = uuid.uuid4()  # Replace with custom naming logic as desired.
 
-# Sample 1: SciBERT Scaling Ladder
+# Sample 1: HPO Scaling Ladder
 ladder_config_1 = SweepRequest(
     experiment_id=f"Bert-ladder-sweep-{ladder_id}",
     base=config_6,

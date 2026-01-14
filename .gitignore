@@ -9,9 +9,11 @@ wheels/
 .coverage
 .pytest_cache/
 coverage.xml
+.ipynb_checkpoints
 
 # Virtual environments
 .venv
+activate
 
 # Data
 bin/
