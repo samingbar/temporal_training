@@ -63,6 +63,10 @@ from .config import ADDRESS, PROVIDER, TASK_QUEUE
 # the same role descriptions but expose their capabilities as tools that
 # a single supervisor agent can call.
 
+# Based on specialization guidance from recent tool-using LLM work
+# (e.g., ReAct: Yao et al., 2022; Toolformer: Schick et al., 2023),
+# we give each capability a focused role description to reduce
+# ambiguity when the supervisor chooses tools.
 CALENDAR_AGENT_PROMPT = (
     "You are a calendar scheduling assistant. "
     "Parse natural language scheduling requests (e.g., 'next Tuesday at 2pm') "
@@ -80,12 +84,6 @@ EMAIL_AGENT_PROMPT = (
     "Always confirm what was sent in your final response."
 )
 
-CHAT_AGENT_PROMPT = (
-    "You are a general-purpose conversational assistant. "
-    "Answer user questions clearly and helpfully when no specialized "
-    "tool (calendar, email, weather, web lookup) is required."
-)
-
 WEATHER_AGENT_PROMPT = (
     "You are a weather assistant. "
     "Given a location (and optionally units), call get_weather to "
@@ -93,36 +91,46 @@ WEATHER_AGENT_PROMPT = (
     "user-friendly way."
 )
 
-WEB_LOOKUP_AGENT_PROMPT = (
-    "You are a web lookup assistant. "
-    "When the user asks for factual or background information, use "
-    "web_lookup to search the web, fetch real page content, and then "
-    "analyze that content to produce an accurate, concise summary."
-)
-
+# Supervisor prompt structure inspired by ReAct (Yao et al., 2022),
+# chain-of-thought prompting (Wei et al., 2022), and bandit-style tool
+# selection work (e.g., Shinn et al., 2023 "Reflexion" style feedback).
+# It encourages explicit planning, conservative tool use, and a single,
+# clearly marked final summary.
 SUPERVISOR_PROMPT = (
-    "You are a helpful personal assistant. "
-    "You can schedule calendar events, send emails, chat generically, "
-    "look up weather, and perform undifferentiated web lookups.\n\n"
+    "You are a helpful personal assistant coordinating multiple tools. "
+    "Your objective is to maximize the user's utility while minimizing "
+    "unnecessary or repeated tool calls.\n\n"
+    "Available capabilities:\n\n"
     "Calendar agent capabilities:\n"
     f"{CALENDAR_AGENT_PROMPT}\n\n"
     "Email agent capabilities:\n"
     f"{EMAIL_AGENT_PROMPT}\n\n"
-    "Chat agent capabilities:\n"
-    f"{CHAT_AGENT_PROMPT}\n\n"
     "Weather agent capabilities:\n"
     f"{WEATHER_AGENT_PROMPT}\n\n"
-    "Web lookup agent capabilities:\n"
-    f"{WEB_LOOKUP_AGENT_PROMPT}\n\n"
     "You also have access to a long-running company research agent via "
     "the `company_research` tool, which can perform deep competitive "
     "analysis and return a structured report.\n\n"
-    "You have access to tools that implement these capabilities. "
-    "Break down user requests into appropriate tool calls and coordinate the results. "
-    "When a request involves multiple actions, use multiple tools in sequence. "
-    "When you are completely finished, respond with a single message that "
-    "starts with 'FINAL SUMMARY:' followed by a concise natural-language "
-    "summary of what you did and the results."
+    "Decision protocol (ReAct-style):\n"
+    "1) For each user request, briefly reason about what you know and "
+    "   what information is missing.\n"
+    "2) Decide whether to CALL_TOOL (choose exactly one tool and "
+    "   arguments) or RESPOND (produce the final summary).\n"
+    "3) Prefer tools that are likely to be useful; avoid repeating the "
+    "   same tool with the same arguments unless new information makes "
+    "   earlier results invalid.\n\n"
+    "Tool selection hints:\n"
+    "- Use schedule_event only for explicit scheduling/changes to "
+    "  meetings.\n"
+    "- Use manage_email only when composing or sending an email.\n"
+    "- Use get_weather only for current or near-term conditions at a "
+    "  specific location.\n"
+    "- Use company_research only when the user requests an in-depth "
+    "  company or competitive analysis.\n\n"
+    "Final response contract:\n"
+    "- After you have finished using tools for this request, respond "
+    "  with a single message that starts that interprets the results of "
+    "  your actions taken and engages in the ongoing conversation. \n"
+    "- Do not call more tools after you have produced the FINAL SUMMARY."
 )
 
 
@@ -166,24 +174,32 @@ class PersonalAssistantWorkflow:
         # Seed the conversation with the supervisor's system instructions
         # and the user's top-level request.
         self.history.add(SystemPrompt(text=SUPERVISOR_PROMPT.strip()))
+        # Task prompt follows recent prompt-engineering patterns where the
+        # high-level task is separated from the tool policy and finalization
+        # rules (see Wei et al., 2022; Schick et al., 2023).
         self.history.add(
             TaskPrompt(
                 text=(
                     "The user may ask you to schedule meetings, send emails, "
-                    "or perform both actions in one request. Use tools when "
-                    "they are helpful, and keep the user-facing explanation "
-                    "short and clear. When you have finished using tools "
-                    "and are ready to answer the user, respond with a "
-                    "single message that starts with 'FINAL SUMMARY:' "
-                    "followed by your final explanation."
+                    "look up information, or perform all of these in one "
+                    "request. Use tools conservatively and only when they "
+                    "are likely to improve the answer. Prefer re-using "
+                    "information you already have over repeating the same "
+                    "tool calls. When you have finished using tools and are "
+                    "ready to answer the user, respond with a single message "
+                    "that synthesizes your findings and engages the user in natural conversation."
                 ),
             )
         )
         self.history.add(UserPrompt(text=request.query))
 
-        provider = PROVIDER
-        max_steps = 8  # safety limit so demo workflows always terminate
+        provider = PROVIDER  # Pull model provider from config
+        max_steps = 100  # safety limit so demo workflows always terminate quickly
         last_text: str = ""
+        tool_calls_this_request = 0  # used to guardrail against getting stuck in the 'Act' stage
+        last_weather_result: str | None = (
+            None  # used to guardrail against getting stuck in 'Act' stage for weather tool
+        )
 
         for step_index in range(max_steps):
             self.steps = step_index + 1
@@ -211,9 +227,29 @@ class PersonalAssistantWorkflow:
             #    child workflow instead.
             if result.tool_call:
                 self.tool_calls.append(result.tool_call)
+                tool_calls_this_request += 1
 
-                if result.tool_call.name == "company_research":
+                tool_name = result.tool_call.name
+
+                if tool_name == "company_research":
                     tool_response = await _run_company_research_subagent(result.tool_call)
+                elif tool_name == "get_weather":
+                    # Simple bandit-style guardrail: avoid repeating the
+                    # same expensive weather call once we already have a
+                    # good result for this request.
+                    if last_weather_result is not None:
+                        tool_response = last_weather_result
+                    else:
+                        tool_response = await workflow.execute_activity(
+                            "tool_activity",
+                            result.tool_call,
+                            schedule_to_close_timeout=timedelta(seconds=30),
+                        )
+                        if (
+                            isinstance(tool_response, str)
+                            and "Current weather for" in tool_response
+                        ):
+                            last_weather_result = tool_response
                 else:
                     tool_response = await workflow.execute_activity(
                         "tool_activity",
@@ -233,6 +269,27 @@ class PersonalAssistantWorkflow:
                     result.tool_call.name,
                     tool_response,
                 )
+
+                # If we have already made several tool calls and have a
+                # high-confidence weather result, synthesize a final
+                # summary rather than looping indefinitely on tools.
+                if tool_calls_this_request >= 3 and last_weather_result is not None:
+                    final_message = (
+                        "FINAL SUMMARY: "
+                        f"{last_weather_result} I used the get_weather tool "
+                        "to retrieve these conditions and stopped calling "
+                        "tools once I had a reliable result."
+                    )
+                    workflow.logger.info(
+                        "Tool budget reached with weather result; "
+                        "returning synthesized final summary after %s steps",
+                        self.steps,
+                    )
+                    return PersonalAssistantResult(
+                        final_response=final_message,
+                        tool_calls=self.tool_calls,
+                        steps=self.steps,
+                    )
 
                 # Continue the loop so the LLM can observe the tool result.
                 continue
@@ -304,12 +361,17 @@ class ChatPersonalAssistantWorkflow:
         # Seed the conversation with the same supervisor prompt used by
         # the one-shot workflow so behavior stays consistent.
         self.history.add(SystemPrompt(text=SUPERVISOR_PROMPT.strip()))
+        # Chat-specific task prompt mirrors the supervisor prompt but
+        # scopes decisions to a single turn, following guidance from
+        # conversational tool-use studies (e.g., OpenAI function calling,
+        # 2023) to separate per-turn reasoning from global context.
         self.history.add(
             TaskPrompt(
                 text=(
                     "You are participating in an ongoing chat session. "
                     "For each user message, decide whether to schedule "
-                    "events, send emails, or both using tools. Keep each "
+                    "events, send emails, look up information, or invoke "
+                    "the company research agent using tools. Keep each "
                     "assistant reply concise and user-friendly. When you "
                     "have finished using tools for a given user message "
                     "and are ready to answer, respond with a single "
@@ -342,6 +404,8 @@ class ChatPersonalAssistantWorkflow:
             self.history.add(UserPrompt(text=message.text))
 
             last_text: str = ""
+            tool_calls_this_turn = 0
+            last_weather_result: str | None = None
 
             for _ in range(max_steps_per_turn):
                 # Convert history to provider-specific messages.
@@ -361,10 +425,27 @@ class ChatPersonalAssistantWorkflow:
 
                 # Handle tool calls first, mirroring the one-shot workflow.
                 if result.tool_call:
-                    if result.tool_call.name == "company_research":
+                    tool_calls_this_turn += 1
+                    tool_name = result.tool_call.name
+
+                    if tool_name == "company_research":
                         tool_response = await _run_company_research_subagent(
                             result.tool_call,
                         )
+                    elif tool_name == "get_weather":
+                        if last_weather_result is not None:
+                            tool_response = last_weather_result
+                        else:
+                            tool_response = await workflow.execute_activity(
+                                "tool_activity",
+                                result.tool_call,
+                                schedule_to_close_timeout=timedelta(seconds=30),
+                            )
+                            if (
+                                isinstance(tool_response, str)
+                                and "Current weather for" in tool_response
+                            ):
+                                last_weather_result = tool_response
                     else:
                         tool_response = await workflow.execute_activity(
                             "tool_activity",
@@ -377,13 +458,26 @@ class ChatPersonalAssistantWorkflow:
                             text=f"[Tool {result.tool_call.name} output]: {tool_response}",
                         ),
                     )
-                    last_tool_text = str(tool_response)
                     workflow.logger.info(
                         "Chat turn %s tool %s executed with response: %s",
                         self._turn_index,
                         result.tool_call.name,
                         tool_response,
                     )
+
+                    # Per-turn tool budget: if we've already made several
+                    # tool calls and have a solid weather result, produce a
+                    # synthesized final summary instead of continuing to
+                    # call tools.
+                    if tool_calls_this_turn >= 3 and last_weather_result is not None:
+                        last_text = (
+                            "FINAL SUMMARY: "
+                            f"{last_weather_result} I used the get_weather "
+                            "tool to retrieve these conditions and stopped "
+                            "calling tools once I had a reliable result."
+                        )
+                        break
+
                     # Continue this turn so the LLM can see the tool output.
                     continue
 

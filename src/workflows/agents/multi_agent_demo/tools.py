@@ -23,8 +23,6 @@ import json
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
-from bs4 import BeautifulSoup
-
 from src.resources.mytools.decorators import tool
 
 
@@ -171,26 +169,6 @@ def manage_email(request: str) -> str:
 
 
 @tool
-def generic_chat(request: str) -> str:
-    """General-purpose chat tool for open-ended questions.
-
-    Use this tool when the user is making a conversational request that
-    does not clearly map to a more specialized capability such as
-    scheduling, email, weather, or web lookup.
-
-    In a real system this would likely delegate to a dedicated LLM agent
-    with conversation memory. For this demo we simply echo the request
-    and describe what a more capable agent would do.
-    """
-    return (
-        "Generic chat agent responding to your request. "
-        "In a production system this tool would call a conversational "
-        "LLM with access to your history. For now, it simply acknowledges "
-        f"that you said: {request!r}."
-    )
-
-
-@tool
 def get_weather(location: str, unit: str = "celsius") -> str:
     """Weather agent tool that fetches real current conditions.
 
@@ -271,94 +249,6 @@ def get_weather(location: str, unit: str = "celsius") -> str:
         f"Current weather for {where}: approximately {temp_value}{temp_suffix}.{wind_part}"
         " Data sourced from the Open-Meteo APIs."
     )
-
-
-@tool
-def web_lookup(query: str) -> str:
-    """Undifferentiated web lookup tool with HTML parsing.
-
-    This implementation uses the DuckDuckGo Instant Answer API to locate
-    a relevant result and then fetches the top page HTML. The HTML is
-    parsed with BeautifulSoup to extract readable text that the
-    web-lookup agent can interpret and summarize.
-    """
-    params = urlencode(
-        {
-            "q": query,
-            "format": "json",
-            "no_redirect": "1",
-            "no_html": "1",
-        }
-    )
-    url = f"https://api.duckduckgo.com/?{params}"
-
-    try:
-        with urlopen(url, timeout=5) as resp:
-            payload = resp.read().decode("utf-8")
-        data = json.loads(payload)
-    except Exception as exc:  # pragma: no cover - network/runtime dependent
-        return f"Web lookup failed for {query!r}: {exc}"
-
-    heading = (data.get("Heading") or "").strip()
-    abstract = (data.get("AbstractText") or "").strip()
-    related = data.get("RelatedTopics") or []
-
-    # Try to find a concrete URL to crawl.
-    candidate_url = (data.get("AbstractURL") or "").strip()
-    if not candidate_url:
-        for topic in related:
-            if isinstance(topic, dict) and "FirstURL" in topic:
-                candidate_url = str(topic["FirstURL"]).strip()
-                if candidate_url:
-                    break
-
-    # Fallback: if we couldn't find a URL, just return the abstract-like
-    # snippet so the agent still has some signal.
-    snippet = abstract
-    if not snippet:
-        for topic in related:
-            if isinstance(topic, dict) and "Text" in topic:
-                maybe = str(topic["Text"]).strip()
-                if maybe:
-                    snippet = maybe
-                    break
-
-    if not candidate_url:
-        if not snippet:
-            snippet = "No descriptive text was returned by the web lookup API."
-        if heading:
-            return f"[Web lookup: {heading}] {snippet}"
-        return f"[Web lookup result] {snippet}"
-
-    # Fetch and parse the HTML of the top result.
-    try:
-        with urlopen(candidate_url, timeout=8) as page_resp:
-            html = page_resp.read().decode("utf-8", errors="ignore")
-    except Exception as exc:  # pragma: no cover - network/runtime dependent
-        # If the page fetch fails, fall back to the API snippet.
-        if not snippet:
-            snippet = f"Web lookup page fetch failed: {exc}"
-        if heading:
-            return f"[Web lookup: {heading}] {snippet}"
-        return f"[Web lookup result] {snippet}"
-
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "noscript"]):
-        tag.decompose()
-
-    text_chunks = list(soup.stripped_strings)
-    if not text_chunks:
-        page_text = "No readable text could be extracted from the page."
-    else:
-        # Limit length so the LLM can process it comfortably.
-        joined = " ".join(text_chunks)
-        page_text = joined[:4000]
-
-    prefix = f"[Web lookup page from {candidate_url}]"
-    if heading:
-        prefix = f"[Web lookup: {heading} – {candidate_url}]"
-
-    return f"{prefix} {snippet}\n\n{page_text}"
 
 
 @tool
