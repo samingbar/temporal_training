@@ -243,9 +243,7 @@ class PersonalAssistantWorkflow:
                 last_text = result.output_text
                 self.history.add(ModelPrompt(text=result.output_text))
                 if result.is_final:
-                    workflow.logger.info(
-                        "LLM produced final summary after %s steps", self.steps
-                    )
+                    workflow.logger.info("LLM produced final summary after %s steps", self.steps)
                     break
 
         final_message = last_text or "The assistant could not produce a response."
