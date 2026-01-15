@@ -15,7 +15,6 @@ from src.resources.myprompts.models import SystemPrompt, TaskPrompt, BasePrompt
 from .config import PROVIDER
 
 
-
 ### DEFINE PROMPTS ###
 SYSTEM_PROMPT = """
 You are an expert Competitive Analysis Agent.
@@ -70,6 +69,8 @@ Executive Summary,
 Comparison Table,
 Actionable Insights.
 """
+
+
 @workflow.defn
 class AgentLoopWorkflow:
     def __init__(self):
@@ -100,7 +101,9 @@ class AgentLoopWorkflow:
             "unless new information makes that result invalid."
         )
         provider = PROVIDER
-        system_prompt = SystemPrompt(text=(SYSTEM_PROMPT.strip() + non_repetition_instructions + final_answer_instructions))
+        system_prompt = SystemPrompt(
+            text=(SYSTEM_PROMPT.strip() + non_repetition_instructions + final_answer_instructions)
+        )
         task_text = MANAGED_AGENT_TASK.format(task_description=input.task).strip()
         task_prompt = TaskPrompt(text=task_text)
 
@@ -117,10 +120,7 @@ class AgentLoopWorkflow:
         # Assemble into provider-specific messages for Gemini
         history_messages = self.history.to_messages(provider=provider)
 
-        next_input = AgentStepInput(
-            task=input.task, 
-            history=history_messages
-            )
+        next_input = AgentStepInput(task=input.task, history=history_messages)
 
         last_output: AgentStepOutput | None = None
 

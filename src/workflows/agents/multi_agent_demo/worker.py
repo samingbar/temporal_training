@@ -18,11 +18,7 @@ async def main() -> None:
     async with Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[
-            PersonalAssistantWorkflow,
-            ChatPersonalAssistantWorkflow,
-            AgentLoopWorkflow
-        ],
+        workflows=[PersonalAssistantWorkflow, ChatPersonalAssistantWorkflow, AgentLoopWorkflow],
         activities=[llm_step_activity, tool_activity],
     ):
         # Keep the worker alive until interrupted (Ctrl+C during demos)

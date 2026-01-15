@@ -118,7 +118,12 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
         normalized = txt.strip().lower()
 
         # Treat as final only if the model explicitly marks it as such.
-        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
+        is_final = (
+            normalized.startswith("final summary:")
+            or normalized.startswith("final summary")
+            or normalized.startswith("final answer:")
+            or normalized.startswith("final answer")
+        )
 
         return AgentStepOutput(
             is_final=is_final,
@@ -163,7 +168,12 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
         # Otherwise treat it as a normal assistant message.
         txt = message.content or ""
         normalized = txt.strip().lower()
-        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
+        is_final = (
+            normalized.startswith("final summary:")
+            or normalized.startswith("final summary")
+            or normalized.startswith("final answer:")
+            or normalized.startswith("final answer")
+        )
 
         return AgentStepOutput(
             is_final=is_final,

@@ -120,8 +120,9 @@ SUPERVISOR_PROMPT = (
     "You have access to tools that implement these capabilities. "
     "Break down user requests into appropriate tool calls and coordinate the results. "
     "When a request involves multiple actions, use multiple tools in sequence. "
-    "When you are done, write a concise final answer for the user that "
-    "summarizes what you did."
+    "When you are completely finished, respond with a single message that "
+    "starts with 'FINAL SUMMARY:' followed by a concise natural-language "
+    "summary of what you did and the results."
 )
 
 
@@ -171,7 +172,10 @@ class PersonalAssistantWorkflow:
                     "The user may ask you to schedule meetings, send emails, "
                     "or perform both actions in one request. Use tools when "
                     "they are helpful, and keep the user-facing explanation "
-                    "short and clear."
+                    "short and clear. When you have finished using tools "
+                    "and are ready to answer the user, respond with a "
+                    "single message that starts with 'FINAL SUMMARY:' "
+                    "followed by your final explanation."
                 ),
             )
         )
@@ -233,15 +237,16 @@ class PersonalAssistantWorkflow:
                 # Continue the loop so the LLM can observe the tool result.
                 continue
 
-            # 3. Capture any plain-text model output and treat the first
-            #    assistant message as the final answer for this request.
+            # 3. Capture any plain-text model output. Only end the loop
+            #    once the model explicitly signals it is finished.
             if result.output_text:
                 last_text = result.output_text
                 self.history.add(ModelPrompt(text=result.output_text))
-                workflow.logger.info(
-                    "LLM produced final answer after %s steps", self.steps
-                )
-                break
+                if result.is_final:
+                    workflow.logger.info(
+                        "LLM produced final summary after %s steps", self.steps
+                    )
+                    break
 
         final_message = last_text or "The assistant could not produce a response."
         return PersonalAssistantResult(
@@ -307,7 +312,11 @@ class ChatPersonalAssistantWorkflow:
                     "You are participating in an ongoing chat session. "
                     "For each user message, decide whether to schedule "
                     "events, send emails, or both using tools. Keep each "
-                    "assistant reply concise and user-friendly."
+                    "assistant reply concise and user-friendly. When you "
+                    "have finished using tools for a given user message "
+                    "and are ready to answer, respond with a single "
+                    "message that starts with 'FINAL SUMMARY:' followed "
+                    "by your final explanation for that turn."
                 ),
             )
         )
@@ -370,6 +379,7 @@ class ChatPersonalAssistantWorkflow:
                             text=f"[Tool {result.tool_call.name} output]: {tool_response}",
                         ),
                     )
+                    last_tool_text = str(tool_response)
                     workflow.logger.info(
                         "Chat turn %s tool %s executed with response: %s",
                         self._turn_index,
@@ -379,12 +389,13 @@ class ChatPersonalAssistantWorkflow:
                     # Continue this turn so the LLM can see the tool output.
                     continue
 
-                # Capture plain-text assistant output and finalize this turn
-                # on the first non-tool assistant message.
+                # Capture plain-text assistant output. Finalize this turn
+                # once the model explicitly signals it is finished.
                 if result.output_text:
                     last_text = result.output_text
                     self.history.add(ModelPrompt(text=result.output_text))
-                    break
+                    if result.is_final:
+                        break
 
             final_text = last_text or "The assistant could not produce a response."
             self._latest_response = ChatResponse(
@@ -403,12 +414,7 @@ async def _run_company_research_subagent(tool_call: ToolCall) -> str:
     inclusion in the main conversation history.
     """
     args = tool_call.arguments or {}
-    company = (
-        args.get("company")
-        or args.get("company_name")
-        or args.get("query")
-        or ""
-    )
+    company = args.get("company") or args.get("company_name") or args.get("query") or ""
 
     if not company:
         return "company_research tool was called without a 'company' argument."
@@ -418,9 +424,7 @@ async def _run_company_research_subagent(tool_call: ToolCall) -> str:
     # Let Temporal choose a deterministic child workflow ID; we only
     # specify the workflow function and input.
     result: dict = await workflow.execute_child_workflow(
-        AgentLoopWorkflow.run,
-        child_input,
-        task_queue="company-research-task-queue"
+        AgentLoopWorkflow.run, child_input, task_queue="company-research-task-queue"
     )
 
     markdown = (result.get("markdown_report") or "").strip()
@@ -438,10 +442,7 @@ async def _run_company_research_subagent(tool_call: ToolCall) -> str:
     else:
         snippet = markdown
 
-    return (
-        "Company research report (markdown excerpt):\n\n"
-        f"{snippet}"
-    )
+    return f"Company research report (markdown excerpt):\n\n{snippet}"
 
 
 async def main() -> None:  # pragma: no cover

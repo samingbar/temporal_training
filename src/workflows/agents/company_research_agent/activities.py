@@ -55,6 +55,7 @@ elif _PROVIDER_NAME == "openai":
 else:
     raise NotImplementedError(f"Unsupported LLM provider for activities: {PROVIDER!r}")
 
+
 @activity.defn(name="company_research_llm_step_activity")
 async def company_research_llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
     contents = step.history
@@ -113,9 +114,7 @@ async def company_research_llm_step_activity(step: AgentStepInput) -> AgentStepO
 
         normalized = txt.strip().lower()
         # Treat as final only if the model explicitly marks it as such.
-        is_final = normalized.startswith("final answer:") or normalized.startswith(
-            "final answer"
-        )
+        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
 
         return AgentStepOutput(
             is_final=is_final,
@@ -155,9 +154,7 @@ async def company_research_llm_step_activity(step: AgentStepInput) -> AgentStepO
         # Otherwise treat it as a normal assistant message.
         txt = message.content or ""
         normalized = txt.strip().lower()
-        is_final = normalized.startswith("final answer:") or normalized.startswith(
-            "final answer"
-        )
+        is_final = normalized.startswith("final answer:") or normalized.startswith("final answer")
 
         return AgentStepOutput(
             is_final=is_final,
