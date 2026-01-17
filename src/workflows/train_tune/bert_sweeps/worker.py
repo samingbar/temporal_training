@@ -13,7 +13,11 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_sweeps.bert_activities import BertEvalActivities, jitter_seed, BertCheckpointingActivities
+from src.workflows.train_tune.bert_sweeps.bert_activities import (
+    BertEvalActivities,
+    jitter_seed,
+    BertCheckpointingActivities,
+)
 from src.workflows.train_tune.bert_sweeps.workflows import (
     BertEvalWorkflow,
     CheckpointedBertTrainingWorkflow,
@@ -52,7 +56,11 @@ async def main() -> None:
             SweepWorkflow,
             LadderSweepWorkflow,
         ],
-        activities=[eval_activities.evaluate_bert_model, jitter_seed,checkpoint_activities.cleanup_run_checkpoints],
+        activities=[
+            eval_activities.evaluate_bert_model,
+            jitter_seed,
+            checkpoint_activities.cleanup_run_checkpoints,
+        ],
         activity_executor=ThreadPoolExecutor(5),
         max_concurrent_activities=1,  # Keep max concurrent activities at 1 for local execution to prevent OOM issues
     )

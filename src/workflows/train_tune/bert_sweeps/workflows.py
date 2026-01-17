@@ -730,7 +730,6 @@ class LadderSweepWorkflow:
                 [(r.run_id, r.accuracy) for r in top[: min(5, len(top))]],
             )
 
-
             if stage_idx < len(stages) - 1:  # Don't cleanup on final stage yet
                 non_survivors = [cfg for cfg in stage_cfgs if cfg.run_id not in top_ids]
                 workflow.logger.info(
@@ -840,9 +839,7 @@ class LadderSweepWorkflow:
                     req.base.fine_tune_config.max_train_samples
                 )
                 if baseline_cfg.evaluation_config.model_path is None:
-                    baseline_cfg.evaluation_config.model_path = (
-                        f"./bert_runs/{baseline_run_id}"
-                    )
+                    baseline_cfg.evaluation_config.model_path = f"./bert_runs/{baseline_run_id}"
 
                 baseline_seed = await workflow.execute_activity(
                     "set_seed",
@@ -858,9 +855,7 @@ class LadderSweepWorkflow:
                 )
 
                 winner_eval.baseline_accuracy = baseline_eval.accuracy
-                winner_eval.improvement_vs_baseline = (
-                    winner_eval.accuracy - baseline_eval.accuracy
-                )
+                winner_eval.improvement_vs_baseline = winner_eval.accuracy - baseline_eval.accuracy
 
                 workflow.logger.info(
                     "Comparison results: winner_accuracy=%.3f baseline_accuracy=%.3f "

@@ -737,7 +737,7 @@ class BertCheckpointingActivities:
     async def cleanup_run_checkpoints(run_id: str) -> None:
         """Delete all checkpoints for a specific run to save disk space."""
         import shutil
-    
+
         run_dir = Path(f"./bert_runs/{run_id}")
         if run_dir.exists():
             checkpoint_dirs = list(run_dir.glob("checkpoint-*"))
@@ -745,8 +745,9 @@ class BertCheckpointingActivities:
                 if ckpt_dir.is_dir():
                     shutil.rmtree(ckpt_dir)
                     activity.logger.info(f"Deleted checkpoint: {ckpt_dir}")
-            
+
             activity.logger.info(f"Cleaned up run: {run_id} ({len(checkpoint_dirs)} checkpoints)")
+
 
 # -------------------------------------------------------------------------------
 # Evaluation Activities
