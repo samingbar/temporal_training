@@ -14,4 +14,4 @@ ADDRESS = "localhost:7233"
 # provider supported by the shared ``myprompts`` / ``mytools`` packages
 # if desired.
 PROVIDER = LLMProvider.OPENAI
-MODEL = "gpt-5"
+MODEL = "gpt-4o-mini"

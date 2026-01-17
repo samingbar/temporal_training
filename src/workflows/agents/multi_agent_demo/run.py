@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.service import RPCError
 
 from .agent_types import ChatMessage, ChatSessionConfig
 from .config import ADDRESS, TASK_QUEUE
@@ -58,9 +59,21 @@ async def main() -> None:
 
         # Wait for a new assistant response for this turn.
         while True:
-            response = await handle.query(ChatPersonalAssistantWorkflow.get_latest_response)
+            try:
+                response = await handle.query(ChatPersonalAssistantWorkflow.get_latest_response)
+            except RPCError:
+                # Query timeouts or expirations are transient in this CLI;
+                # back off briefly and retry.
+                await asyncio.sleep(0.5)
+                continue
+
             if response is not None and response.turn_index > last_seen_turn:
-                print(f"assistant> {response.text}")  # noqa: T201
+                text = response.text or ""
+                prefix = "FINAL SUMMARY: "
+                if text.startswith(prefix):
+                    text = text[len(prefix) :].lstrip()
+
+                print(f"assistant> {text}")  # noqa: T201
                 last_seen_turn = response.turn_index
                 break
 
