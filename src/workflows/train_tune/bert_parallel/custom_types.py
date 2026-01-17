@@ -116,7 +116,6 @@ class BertFineTuneConfig(BaseModel):
     )
     num_epochs: int = Field(
         gt=0,
-        le=20,
         default=3,
         description="Number of training epochs.",
     )

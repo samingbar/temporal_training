@@ -301,7 +301,7 @@ async def main() -> None:
         task_queue="bert-eval-task-queue",
     )
 
-    # 4. Print a concise, tabular summary of the winning candidate & result.
+    # 4. Print a concise, tabular summary of the comparison runs.
     results = result if isinstance(result, (list, tuple)) else [result]
 
     print("\n=== BERT evaluation summary ===")
@@ -319,8 +319,8 @@ async def main() -> None:
             f"{item.accuracy:>9.3f}",
         )
 
-    # If the ladder workflow annotated the best result with ablation metadata,
-    # print the improvement in accuracy over the ablation baseline.
+    # If the ladder workflow annotated the best result with comparison metadata,
+    # print the improvement in accuracy over the baseline run.
     best = results[0]
     baseline = getattr(best, "baseline_accuracy", None)
     improvement = getattr(best, "improvement_vs_baseline", None)
@@ -328,7 +328,7 @@ async def main() -> None:
         print(
             "\nBest run "
             f"{best.run_id} improved accuracy by {improvement:.3f} "
-            f"over the ablation baseline "
+            f"over the baseline comparison run "
             f"(baseline={baseline:.3f}, best={best.accuracy:.3f}).",
         )
 

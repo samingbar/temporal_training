@@ -71,7 +71,11 @@ At a high level:
           - Samples new candidates from distributions biased toward good regions of the search space.
       - Call `CoordinatorWorkflow` for each candidate (respecting `max_concurrency` via a semaphore).
       - Record `TrialResult` entries (config + eval metrics + normalized score).
-    - Return the final stage’s leaderboard.
+    - After the final stage:
+      - Launch a comparison job that:
+        - Re-trains the best configuration for the total ladder epoch budget.
+        - Trains a fresh random baseline configuration for twice that epoch budget.
+      - Return a compact comparison `list[BertEvalResult]` containing the winner and baseline runs, with the winner annotated with `baseline_accuracy` and `improvement_vs_baseline`.
 
 ---
 

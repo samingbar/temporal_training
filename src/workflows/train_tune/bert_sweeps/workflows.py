@@ -614,20 +614,26 @@ class LadderSweepWorkflow:
         sem = asyncio.Semaphore(req.max_concurrency)
         history: list[_TrialObs] = []
 
-        # (epochs, max_train_samples, keep_top_k, n_new_candidates)
+        # (max_train_samples, keep_top_k, n_new_candidates)
         # NOTE: n_new must be present for every stage; last stage uses 0 new candidates.
-        stages: list[tuple[int, int | None, int, int]] = [
-            (1, 1000, max(1, req.num_trials // 4), req.num_trials),
-            (2, 2000, max(1, req.num_trials // 6), max(1, req.num_trials // 2)),
-            (3, 5000, max(1, req.num_trials // 8), max(1, req.num_trials // 4)),
-            # Final rung: evaluate remaining survivors at full budget; no new candidates
-            (4, req.base.fine_tune_config.max_train_samples, 1, 0),
+        # Epoch schedule is implicit: for stage index ``i`` we train for
+        # ``2**i`` epochs, i.e. 1, 2, 4, 8, … as we ascend the ladder.
+        stages: list[tuple[int | None, int, int]] = [
+            (1000, max(1, req.num_trials // 4), req.num_trials),
+            (2000, max(1, req.num_trials // 6), max(1, req.num_trials // 2)),
+            (5000, max(1, req.num_trials // 8), max(1, req.num_trials // 4)),
+            # Final rung: evaluate remaining survivors at full data budget; no new candidates
+            (req.base.fine_tune_config.max_train_samples, 1, 0),
         ]
+
+        epoch_schedule: list[int] = [2**i for i in range(len(stages))]
+        total_ladder_epochs = 0
 
         survivors: list[CoordinatorWorkflowConfig] = []
         last_ranked: list[BertEvalResult] = []
 
-        for stage_idx, (epochs, max_train, keep_k, n_new) in enumerate(stages):
+        for stage_idx, (max_train, keep_k, n_new) in enumerate(stages):
+            epochs = epoch_schedule[stage_idx]
             stage_cfgs: list[CoordinatorWorkflowConfig] = []
 
             # Promote survivors (same run_id; higher budget)
@@ -676,6 +682,10 @@ class LadderSweepWorkflow:
 
                 stage_cfgs.append(c)
 
+            # Accumulate the total ladder epoch budget as
+            # "epochs × number of configs at this rung".
+            total_ladder_epochs += len(stage_cfgs) * epochs
+
             # If we have no work this stage, stop cleanly
             if not stage_cfgs:
                 workflow.logger.warning("Stage %s produced no configs; stopping.", stage_idx)
@@ -720,9 +730,34 @@ class LadderSweepWorkflow:
                 [(r.run_id, r.accuracy) for r in top[: min(5, len(top))]],
             )
 
-            # Early exit only if (a) we are at the final rung. In that case
-            # we run an ablation-style baseline on the best configuration and
-            # annotate the best result with its improvement over that baseline.
+
+            if stage_idx < len(stages) - 1:  # Don't cleanup on final stage yet
+                non_survivors = [cfg for cfg in stage_cfgs if cfg.run_id not in top_ids]
+                workflow.logger.info(
+                    f"Stage {stage_idx}: Cleaning up {len(non_survivors)} non-survivors"
+                )
+                for cfg in non_survivors:
+                    try:
+                        await workflow.execute_activity(
+                            "cleanup_run_checkpoints",
+                            cfg.run_id,
+                            start_to_close_timeout=timedelta(minutes=5),
+                        )
+                        workflow.logger.info(f"Cleaned up non-survivor: {cfg.run_id}")
+                    except Exception:
+                        workflow.logger.warning(
+                            f"Failed to cleanup {cfg.run_id}",
+                            exc_info=True,
+                        )
+
+            # Early exit only if (a) we are at the final rung. In that case we
+            # launch two additional comparison runs:
+            #
+            # 1) A "winner" job that re-trains the best configuration from
+            #    scratch for the total ladder epoch budget.
+            # 2) A "baseline" job that uses a fresh random configuration and
+            #    trains for twice the total ladder epoch budget (capped by
+            #    the model's maximum supported epoch count).
             is_last_stage = stage_idx == len(stages) - 1
             if is_last_stage:
                 if not last_ranked:
@@ -734,138 +769,118 @@ class LadderSweepWorkflow:
                 best_cfg = next((cfg for cfg in stage_cfgs if cfg.run_id == best_run_id), None)
                 if best_cfg is None:
                     workflow.logger.warning(
-                        "Could not locate config for best run %s; skipping ablation.",
+                        "Could not locate config for best run %s; skipping comparison runs.",
                         best_run_id,
                     )
                     return last_ranked
 
-                # Build an ablation config by reusing the best hyperparameters
-                # but reverting the training budget (epochs / max_train_samples)
-                # to the first ladder stage. This provides a baseline to
-                # quantify how much the full-ladder schedule improved accuracy.
-                ablation_cfg = best_cfg.model_copy(deep=True)
-                ablation_run_id = f"{best_cfg.run_id}-ablation"
-                ablation_cfg.run_id = ablation_run_id
-                ablation_cfg.fine_tune_config.run_id = ablation_run_id
-                ablation_cfg.evaluation_config.run_id = ablation_run_id
+                # Compute comparison budgets directly from the ladder schedule:
+                # the winner run uses the total ladder epochs, and the baseline
+                # uses twice that many epochs.
+                winner_epochs = total_ladder_epochs
+                baseline_epochs = 2 * total_ladder_epochs
 
-                base_epochs, base_max_train, _keep0, _nnew0 = stages[0]
-                ablation_cfg.fine_tune_config.num_epochs = base_epochs
-                ablation_cfg.fine_tune_config.max_train_samples = base_max_train
-
-                ablation_cfg.evaluation_config.batch_size = ablation_cfg.fine_tune_config.batch_size
-                ablation_cfg.evaluation_config.max_seq_length = (
-                    ablation_cfg.fine_tune_config.max_seq_length
+                workflow.logger.info(
+                    "Launching comparison runs for best run %s: "
+                    "winner_epochs=%s, baseline_epochs=%s, total_ladder_epochs=%s",
+                    best_run_id,
+                    winner_epochs,
+                    baseline_epochs,
+                    total_ladder_epochs,
                 )
 
-                old_default = f"./bert_runs/{best_cfg.run_id}"
-                new_default = f"./bert_runs/{ablation_run_id}"
+                # 1) Winner comparison job: reuse the best hyperparameters but
+                #    train from scratch for the total ladder epoch budget.
+                winner_cfg = best_cfg.model_copy(deep=True)
+                winner_run_id = f"{best_cfg.run_id}-ladder-total"
+                winner_cfg.run_id = winner_run_id
+                winner_cfg.fine_tune_config.run_id = winner_run_id
+                winner_cfg.evaluation_config.run_id = winner_run_id
+                winner_cfg.fine_tune_config.num_epochs = winner_epochs
 
-                if ablation_cfg.evaluation_config.model_path in (None, old_default):
-                    ablation_cfg.evaluation_config.model_path = new_default
+                winner_cfg.evaluation_config.batch_size = winner_cfg.fine_tune_config.batch_size
+                winner_cfg.evaluation_config.max_seq_length = (
+                    winner_cfg.fine_tune_config.max_seq_length
+                )
+                if winner_cfg.evaluation_config.model_path is None:
+                    winner_cfg.evaluation_config.model_path = f"./bert_runs/{winner_run_id}"
 
-                try:
-                    seed = await workflow.execute_activity(
-                        "set_seed",
-                        req.seed,
-                        start_to_close_timeout=timedelta(seconds=10),
-                    )
-                    ablation_cfg.fine_tune_config.seed = seed
-                    ablation_cfg.evaluation_config.seed = seed
+                winner_seed = await workflow.execute_activity(
+                    "set_seed",
+                    req.seed,
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                winner_cfg.fine_tune_config.seed = winner_seed
+                winner_cfg.evaluation_config.seed = winner_seed
 
-                    ablation_result = await LadderSweepWorkflow._run_one_cfg(
-                        sem, ablation_cfg, "ablation"
+                # 2) Baseline comparison job: draw a fresh random configuration
+                #    from the sweep space and train for twice the ladder budget.
+                baseline_cfg = req.base.model_copy(deep=True)
+                baseline_run_id = f"{req.experiment_id}-baseline-{workflow.uuid4()}"
+                baseline_cfg.run_id = baseline_run_id
+                baseline_cfg.fine_tune_config.run_id = baseline_run_id
+                baseline_cfg.evaluation_config.run_id = baseline_run_id
+
+                selected_batch_size = rng.choice(req.space.batch_size)
+                baseline_cfg.fine_tune_config.batch_size = selected_batch_size
+                baseline_cfg.evaluation_config.batch_size = selected_batch_size
+
+                selected_max_seq_length = rng.choice(req.space.max_seq_length)
+                baseline_cfg.fine_tune_config.max_seq_length = selected_max_seq_length
+                baseline_cfg.evaluation_config.max_seq_length = selected_max_seq_length
+
+                lo, hi = req.space.learning_rate
+                u = rng.random()
+                baseline_cfg.fine_tune_config.learning_rate = float(
+                    math.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
+                )
+
+                baseline_cfg.fine_tune_config.num_epochs = baseline_epochs
+                baseline_cfg.fine_tune_config.max_train_samples = (
+                    req.base.fine_tune_config.max_train_samples
+                )
+                if baseline_cfg.evaluation_config.model_path is None:
+                    baseline_cfg.evaluation_config.model_path = (
+                        f"./bert_runs/{baseline_run_id}"
                     )
 
-                    best_result.baseline_accuracy = ablation_result.accuracy
-                    best_result.improvement_vs_baseline = (
-                        best_result.accuracy - ablation_result.accuracy
-                    )
-                    workflow.logger.info(
-                        "Ablation baseline for best run %s: baseline_accuracy=%.3f, "
-                        "best_accuracy=%.3f, improvement=%.3f",
-                        best_run_id,
-                        ablation_result.accuracy,
-                        best_result.accuracy,
-                        best_result.improvement_vs_baseline,
-                    )
-                except Exception:
-                    # If the ablation run fails for any reason, we still return
-                    # the final rung leaderboard; the metadata fields remain unset.
-                    workflow.logger.warning(
-                        "Ablation run for best configuration %s failed; "
-                        "returning final rung leaderboard without ablation metadata.",
-                        best_run_id,
-                        exc_info=True,
-                    )
+                baseline_seed = await workflow.execute_activity(
+                    "set_seed",
+                    req.seed,
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                baseline_cfg.fine_tune_config.seed = baseline_seed
+                baseline_cfg.evaluation_config.seed = baseline_seed
 
-                return last_ranked
+                winner_eval, baseline_eval = await asyncio.gather(
+                    LadderSweepWorkflow._run_one_cfg(sem, winner_cfg, "winner-total"),
+                    LadderSweepWorkflow._run_one_cfg(sem, baseline_cfg, "baseline-total"),
+                )
+
+                winner_eval.baseline_accuracy = baseline_eval.accuracy
+                winner_eval.improvement_vs_baseline = (
+                    winner_eval.accuracy - baseline_eval.accuracy
+                )
+
+                workflow.logger.info(
+                    "Comparison results: winner_accuracy=%.3f baseline_accuracy=%.3f "
+                    "improvement=%.3f",
+                    winner_eval.accuracy,
+                    baseline_eval.accuracy,
+                    winner_eval.improvement_vs_baseline,
+                )
+
+                # Return a compact comparison: [winner_eval, baseline_eval].
+                return [winner_eval, baseline_eval]
 
             # Otherwise keep iterating unless we're down to <= 1 survivor,
             # in which case additional rungs would not change the ordering.
             if len(survivors) <= 1:
                 continue
 
-        # Fallback: return best seen overall if stages exhausted unexpectedly
+        # Fallback: if the ladder exited unexpectedly before reaching the final
+        # stage, return the best-ranked results seen so far (if any).
         if last_ranked:
             return last_ranked
 
-        best_overall = sorted(history, key=lambda o: o.score, reverse=True)
-        if not best_overall:
-            return []
-
-        best_cfg = best_overall[0].cfg.model_copy(deep=True)
-        if best_cfg.run_id is None:
-            best_cfg.run_id = best_overall[0].run_id
-        best_cfg.fine_tune_config.run_id = best_cfg.run_id
-        best_cfg.evaluation_config.run_id = best_cfg.run_id
-        best_cfg.evaluation_config.batch_size = best_cfg.fine_tune_config.batch_size
-        best_cfg.evaluation_config.max_seq_length = best_cfg.fine_tune_config.max_seq_length
-
-        old_default = f"./bert_runs/{best_cfg.run_id}"
-        new_default = f"./bert_runs/{ablation_run_id}"
-
-        if best_cfg.evaluation_config.model_path in (None. old_default):
-            best_cfg.evaluation_config.model_path = new_default
-        best_result = await LadderSweepWorkflow._run_one_cfg(sem, best_cfg, "best-fallback")
-
-        # Best-effort ablation in the fallback path as well: use the same
-        # hyperparameters but revert training budget to the first stage.
-        try:
-            ablation_cfg = best_cfg.model_copy(deep=True)
-            ablation_run_id = f"{best_cfg.run_id}-ablation"
-            ablation_cfg.run_id = ablation_run_id
-            ablation_cfg.fine_tune_config.run_id = ablation_run_id
-            ablation_cfg.evaluation_config.run_id = ablation_run_id
-
-            base_epochs, base_max_train, _keep0, _nnew0 = stages[0]
-            ablation_cfg.fine_tune_config.num_epochs = base_epochs
-            ablation_cfg.fine_tune_config.max_train_samples = base_max_train
-
-            ablation_cfg.evaluation_config.batch_size = ablation_cfg.fine_tune_config.batch_size
-            ablation_cfg.evaluation_config.max_seq_length = (
-                ablation_cfg.fine_tune_config.max_seq_length
-            )
-            if ablation_cfg.evaluation_config.model_path is None:
-                ablation_cfg.evaluation_config.model_path = f"./bert_runs/{ablation_run_id}"
-
-            seed = await workflow.execute_activity(
-                "set_seed",
-                req.seed,
-                start_to_close_timeout=timedelta(seconds=10),
-            )
-            ablation_cfg.fine_tune_config.seed = seed
-            ablation_cfg.evaluation_config.seed = seed
-
-            ablation_result = await LadderSweepWorkflow._run_one_cfg(sem, ablation_cfg, "ablation")
-            best_result.baseline_accuracy = ablation_result.accuracy
-            best_result.improvement_vs_baseline = best_result.accuracy - ablation_result.accuracy
-        except Exception:
-            workflow.logger.warning(
-                "Fallback ablation run for best configuration %s failed; "
-                "returning best result without ablation metadata.",
-                best_cfg.run_id,
-                exc_info=True,
-            )
-
-        return [best_result]
+        return []

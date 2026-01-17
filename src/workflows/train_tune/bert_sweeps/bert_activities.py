@@ -407,8 +407,10 @@ class BertFineTuneActivities:
         # Aim for a couple of checkpoints per epoch when possible.
         save_steps = max(1, steps_per_epoch // 2)
 
+        output_dir = f"./bert_runs/{request.run_id}"
+
         training_args = TrainingArguments(
-            output_dir=f"./bert_runs/{request.run_id}",
+            output_dir=output_dir,
             num_train_epochs=float(self.config.num_epochs),
             per_device_train_batch_size=self.config.batch_size,
             per_device_eval_batch_size=self.config.batch_size,
@@ -419,7 +421,8 @@ class BertFineTuneActivities:
             save_total_limit=3,
             logging_strategy="steps",
             logging_steps=save_steps,
-            report_to=[],
+            logging_dir=f"{output_dir}/tb",
+            report_to=["tensorboard"],
             load_best_model_at_end=False,
         )
 
@@ -620,8 +623,6 @@ class BertFineTuneActivities:
 # -------------------------------------------------------------------------------
 # Checkpointing Activities
 # -------------------------------------------------------------------------------
-
-
 class BertCheckpointingActivities:
     @staticmethod
     def _create_dataset_snapshot_sync(request: DatasetSnapshotRequest) -> DatasetSnapshotResult:
@@ -731,6 +732,21 @@ class BertCheckpointingActivities:
 
         return snapshot
 
+    @staticmethod
+    @activity.defn
+    async def cleanup_run_checkpoints(run_id: str) -> None:
+        """Delete all checkpoints for a specific run to save disk space."""
+        import shutil
+    
+        run_dir = Path(f"./bert_runs/{run_id}")
+        if run_dir.exists():
+            checkpoint_dirs = list(run_dir.glob("checkpoint-*"))
+            for ckpt_dir in checkpoint_dirs:
+                if ckpt_dir.is_dir():
+                    shutil.rmtree(ckpt_dir)
+                    activity.logger.info(f"Deleted checkpoint: {ckpt_dir}")
+            
+            activity.logger.info(f"Cleaned up run: {run_id} ({len(checkpoint_dirs)} checkpoints)")
 
 # -------------------------------------------------------------------------------
 # Evaluation Activities

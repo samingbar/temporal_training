@@ -151,7 +151,8 @@ def _fine_tune_bert_sync(request: BertFineTuneRequest) -> BertFineTuneResult:
         eval_strategy="epoch" if eval_dataset is not None else "no",
         save_strategy="no",
         logging_strategy="epoch",
-        report_to=[],
+        logging_dir=f"./bert_runs/{request.run_id}/tb",
+        report_to=["tensorboard"],
         load_best_model_at_end=False,
     )
 

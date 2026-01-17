@@ -13,7 +13,7 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_sweeps.bert_activities import BertEvalActivities, jitter_seed
+from src.workflows.train_tune.bert_sweeps.bert_activities import BertEvalActivities, jitter_seed, BertCheckpointingActivities
 from src.workflows.train_tune.bert_sweeps.workflows import (
     BertEvalWorkflow,
     CheckpointedBertTrainingWorkflow,
@@ -39,6 +39,7 @@ async def main() -> None:
     # 3. Instantiate activity collections. For this worker we only need the
     # evaluation activities; training and checkpointing are handled elsewhere.
     eval_activities = BertEvalActivities()
+    checkpoint_activities = BertCheckpointingActivities()
 
     # 4. Build worker
     worker = Worker(
@@ -51,7 +52,7 @@ async def main() -> None:
             SweepWorkflow,
             LadderSweepWorkflow,
         ],
-        activities=[eval_activities.evaluate_bert_model, jitter_seed],
+        activities=[eval_activities.evaluate_bert_model, jitter_seed,checkpoint_activities.cleanup_run_checkpoints],
         activity_executor=ThreadPoolExecutor(5),
         max_concurrent_activities=1,  # Keep max concurrent activities at 1 for local execution to prevent OOM issues
     )

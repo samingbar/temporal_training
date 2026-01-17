@@ -172,13 +172,28 @@ class TestBertSweepsWorkflows:
                 task_queue=task_queue,
             )
 
-            # LadderSweepWorkflow returns a leaderboard of BertEvalResult entries.
+            # LadderSweepWorkflow returns a compact comparison:
+            # [winner_eval, baseline_eval].
             assert isinstance(results, list)
-            assert results
-            for item in results:
-                assert isinstance(item, BertEvalResult)
-                assert item.dataset_name == "glue"
-                assert item.dataset_config_name == "sst2"
-                assert item.split == "validation"
-                assert item.num_examples > 0
-                assert 0.0 <= item.accuracy <= 1.0
+            assert len(results) == 2
+
+            winner, baseline = results
+
+            assert isinstance(winner, BertEvalResult)
+            assert isinstance(baseline, BertEvalResult)
+
+            assert winner.dataset_name == "glue"
+            assert winner.dataset_config_name == "sst2"
+            assert winner.split == "validation"
+            assert winner.num_examples > 0
+            assert 0.0 <= winner.accuracy <= 1.0
+
+            assert baseline.dataset_name == "glue"
+            assert baseline.dataset_config_name == "sst2"
+            assert baseline.split == "validation"
+            assert baseline.num_examples > 0
+            assert 0.0 <= baseline.accuracy <= 1.0
+
+            # Winner should be annotated with comparison metadata.
+            assert winner.baseline_accuracy is not None
+            assert winner.improvement_vs_baseline is not None

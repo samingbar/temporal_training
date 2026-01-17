@@ -440,7 +440,8 @@ class BertFineTuneActivities:
             save_total_limit=3,
             logging_strategy="steps",
             logging_steps=save_steps,
-            report_to=[],
+            logging_dir=f"./bert_runs/{request.run_id}/tb",
+            report_to=["tensorboard"],
             load_best_model_at_end=False,
         )
 

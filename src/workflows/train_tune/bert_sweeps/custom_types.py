@@ -116,7 +116,6 @@ class BertFineTuneConfig(BaseModel):
     )
     num_epochs: int = Field(
         gt=0,
-        le=20,
         default=3,
         description="Number of training epochs.",
     )
@@ -377,14 +376,14 @@ class BertEvalResult(BaseModel):
     baseline_accuracy: float | None = Field(
         default=None,
         description=(
-            "Optional baseline accuracy used for ablation comparison for this result "
-            "(for example, a lower-budget training configuration)."
+            "Optional baseline accuracy used for comparison for this result "
+            "(for example, a lower-budget run or a randomized baseline)."
         ),
     )
     improvement_vs_baseline: float | None = Field(
         default=None,
         description=(
-            "Optional improvement in accuracy over the ablation baseline "
+            "Optional improvement in accuracy over the comparison baseline "
             "(accuracy - baseline_accuracy)."
         ),
     )
