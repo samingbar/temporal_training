@@ -381,4 +381,3 @@ inside activities, you can iterate on agent logic safely while relying on:
 - Temporal for durability and retries.
 - The provider abstraction for model portability.
 - The shared tools layer for reusing integrations across agents.
-
