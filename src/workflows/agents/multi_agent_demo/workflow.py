@@ -29,13 +29,7 @@ from typing import List
 from temporalio import workflow
 
 from src.resources.myprompts.history import PromptHistory
-from src.resources.myprompts.models import (
-    BasePrompt,
-    ModelPrompt,
-    SystemPrompt,
-    TaskPrompt,
-    UserPrompt,
-)
+from src.resources.myprompts.models import ModelPrompt, SystemPrompt, TaskPrompt, UserPrompt
 
 from src.resources.custom_types.types import AgentInput as CompanyResearchAgentInput
 from src.workflows.agents.company_research_agent.workflow import AgentLoopWorkflow

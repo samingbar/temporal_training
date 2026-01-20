@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+"""Shared Pydantic models for the multi-agent demo.
+
+These types define the data contract between workflows and activities
+(`AgentStepInput`/`AgentStepOutput`, `ToolCall`, etc.) as well as
+the inputs/outputs used by the CLI and workflow APIs.
+"""
+
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
-
-
-class AgentInput(BaseModel):
-    """Basic agent task wrapper used by low-level LLM calls."""
-
-    task: str
 
 
 class LlmResponse(BaseModel):

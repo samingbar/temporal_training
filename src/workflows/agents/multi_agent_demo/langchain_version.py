@@ -1,3 +1,5 @@
+"""Reference-only LangChain version; not used by the Temporal worker."""
+
 # Source: https://docs.langchain.com/oss/python/langchain/multi-agent/subagents-personal-assistant#1-define-tools
 from langchain.tools import tool
 from langchain.agents import create_agent

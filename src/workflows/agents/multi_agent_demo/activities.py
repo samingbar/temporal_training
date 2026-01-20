@@ -1,10 +1,17 @@
-import inspect
-import typing
-import io
-import textwrap
-import base64
-import json
+"""Activities for LLM steps and tool execution in the multi-agent demo.
 
+Workflows build a provider-agnostic prompt history, convert it into an
+``AgentStepInput``, and call ``llm_step_activity``. This activity then
+talks to the configured provider (OpenAI, Gemini, etc.) and normalizes
+the result into an ``AgentStepOutput`` with either assistant text or a
+requested ``ToolCall``. Tool calls are executed by ``tool_activity``,
+which dispatches to the registered Python functions and returns their
+string result back to the workflow.
+"""
+
+import inspect
+import json
+import typing
 from typing import Any, Dict
 
 from google import genai
@@ -31,6 +38,12 @@ def _provider_name(provider) -> str:
     if hasattr(provider, "value"):
         return str(getattr(provider, "value")).lower()
     return str(provider).lower()
+
+
+def _is_final_text(text: str) -> bool:
+    """Return True if the model text explicitly marks a final answer."""
+    normalized = text.strip().lower()
+    return normalized.startswith("final summary") or normalized.startswith("final answer")
 
 
 _PROVIDER_NAME = _provider_name(PROVIDER)
@@ -115,15 +128,8 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
         if txt is None:
             txt = str(part)
 
-        normalized = txt.strip().lower()
-
         # Treat as final only if the model explicitly marks it as such.
-        is_final = (
-            normalized.startswith("final summary:")
-            or normalized.startswith("final summary")
-            or normalized.startswith("final answer:")
-            or normalized.startswith("final answer")
-        )
+        is_final = _is_final_text(txt)
 
         return AgentStepOutput(
             is_final=is_final,
@@ -167,13 +173,7 @@ async def llm_step_activity(step: AgentStepInput) -> AgentStepOutput:
 
         # Otherwise treat it as a normal assistant message.
         txt = message.content or ""
-        normalized = txt.strip().lower()
-        is_final = (
-            normalized.startswith("final summary:")
-            or normalized.startswith("final summary")
-            or normalized.startswith("final answer:")
-            or normalized.startswith("final answer")
-        )
+        is_final = _is_final_text(txt)
 
         return AgentStepOutput(
             is_final=is_final,
